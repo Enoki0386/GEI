@@ -237,6 +237,23 @@ local function createOwnedFolder(folderName, ownedSet, parent)
 	return folder
 end
 
+local function replaceOwnedTool(ownedToolsFolder, toolId)
+	for _, child in ipairs(ownedToolsFolder:GetChildren()) do
+		if child:IsA("BoolValue") and child.Name ~= toolId then
+			child:Destroy()
+		end
+	end
+
+	createValue("BoolValue", toolId, true, ownedToolsFolder)
+end
+
+local function applyWalkSpeed(character)
+	local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
+	if humanoid and GameData.Player and type(GameData.Player.WalkSpeed) == "number" then
+		humanoid.WalkSpeed = GameData.Player.WalkSpeed
+	end
+end
+
 local function getPlayerDataFolder(player)
 	return dataFoldersByPlayer[player] or player:FindFirstChild("PlayerData")
 end
@@ -359,6 +376,11 @@ local function setupPlayer(player)
 	local backpack = GameData.GetBackpack(saveData.EquippedBackpack) or GameData.GetBackpack("SmallBag")
 	local tool = GameData.GetTool(saveData.EquippedTool) or GameData.GetTool("Brush")
 
+	player.CharacterAdded:Connect(applyWalkSpeed)
+	if player.Character then
+		task.defer(applyWalkSpeed, player.Character)
+	end
+
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
 	leaderstats.Parent = player
@@ -381,6 +403,10 @@ local function setupPlayer(player)
 
 	createOwnedFolder("OwnedTools", saveData.OwnedTools, dataFolder)
 	createOwnedFolder("OwnedBackpacks", saveData.OwnedBackpacks, dataFolder)
+	local ownedToolsFolder = dataFolder:FindFirstChild("OwnedTools")
+	if ownedToolsFolder then
+		replaceOwnedTool(ownedToolsFolder, tool.Id)
+	end
 
 	for _, child in ipairs(dataFolder:GetChildren()) do
 		if child:IsA("ValueBase") then
@@ -567,6 +593,10 @@ function PlayerManager.BuyItem(player, category, itemId)
 			return false, "UnknownTool"
 		end
 		if PlayerManager.HasTool(player, itemId) then
+			local ownedFolder = getOwnedFolder(dataFolder, category)
+			if ownedFolder then
+				replaceOwnedTool(ownedFolder, itemId)
+			end
 			local equipped = PlayerManager.EquipTool(player, itemId)
 			return equipped, equipped and "Equipped" or "CannotEquip"
 		end
@@ -582,7 +612,7 @@ function PlayerManager.BuyItem(player, category, itemId)
 		end
 
 		leaderstats.Cash.Value -= tool.Price
-		createValue("BoolValue", itemId, true, ownedFolder)
+		replaceOwnedTool(ownedFolder, itemId)
 		PlayerManager.EquipTool(player, itemId)
 		pushPlayerData(player)
 		return true, "Bought"

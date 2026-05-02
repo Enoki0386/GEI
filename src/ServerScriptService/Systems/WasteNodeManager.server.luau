@@ -170,6 +170,15 @@ local function countActiveWaste(wasteZone)
 	return count
 end
 
+local function getTargetWasteCount(surface)
+	local spawnConfig = GameData.Spawn
+	local density = spawnConfig.DensityPerStud or 0.003
+	local minNodes = spawnConfig.MinNodes or 8
+	local maxNodes = spawnConfig.MaxNodes or 60
+	local area = math.max(0, surface.Size.X * surface.Size.Z)
+	return math.clamp(math.floor(area * density + 0.5), minNodes, maxNodes)
+end
+
 local function findSpawnPosition(surface, wasteZone)
 	local margin = 6
 	local halfX = math.max(1, surface.Size.X / 2 - margin)
@@ -633,8 +642,9 @@ task.spawn(function()
 
 		if surface and wasteZone then
 			local activeWaste = countActiveWaste(wasteZone)
+			local targetWaste = getTargetWasteCount(surface)
 
-			while activeWaste < GameData.Spawn.MaxWasteNodes do
+			while activeWaste < targetWaste do
 				local spawnPosition = findSpawnPosition(surface, wasteZone)
 				if not spawnPosition then
 					break

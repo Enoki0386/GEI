@@ -4,7 +4,7 @@ local GameData = {}
 
 -- DEBUG MODE: mettre Enabled = false avant publication
 GameData.Debug = {
-	Enabled = true,
+	Enabled = false,
 	StartingCash = 5000,
 	StartingDiamonds = 500,
 	StartingWaste = 0,
@@ -14,11 +14,17 @@ GameData.Debug = {
 GameData.Spawn = {
 	SurfaceName = "SpawnSurface1",
 	WasteZoneName = "WasteZone",
-	MaxWasteNodes = 18,
+	DensityPerStud = 0.003,
+	MinNodes = 8,
+	MaxNodes = 60,
 	SpawnInterval = 2.5,
 	MinDistanceBetweenWaste = 8,
 	MinDistanceFromPlayers = 12,
 	MaxSpawnAttempts = 45,
+}
+
+GameData.Player = {
+	WalkSpeed = 22,
 }
 
 GameData.WasteDisplay = {
@@ -134,7 +140,7 @@ GameData.Tools = {
 		Range = 24,
 		Cooldown = 0.42,
 		Color = Color3.fromRGB(95, 211, 210),
-		Description = "A long-range wand with strong cleanup power.",
+		Description = "A focused cleanup wand with strong power.",
 		Visual = {
 			HandleColor = Color3.fromRGB(55, 73, 92),
 			BristleColor = Color3.fromRGB(95, 211, 210),

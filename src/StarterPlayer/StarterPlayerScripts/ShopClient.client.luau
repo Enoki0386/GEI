@@ -403,8 +403,7 @@ local function refreshDetails()
 
 	if selectedCategory == "Tool" then
 		addDetailRow("Damage", tostring(config.Damage), 1)
-		addDetailRow("Range", tostring(config.Range), 2)
-		addDetailRow("Cooldown", string.format("%.2fs", config.Cooldown or 0), 3)
+		addDetailRow("Cooldown", string.format("%.2fs", config.Cooldown or 0), 2)
 	else
 		addDetailRow("Capacity", formatNumber(config.Capacity), 1)
 	end
@@ -492,7 +491,7 @@ local function createItemCard(category, itemId, config, layoutOrder)
 
 	local statText
 	if category == "Tool" then
-		statText = tostring(config.Damage) .. " DMG  |  " .. tostring(config.Range) .. " RNG"
+		statText = tostring(config.Damage) .. " DMG"
 	else
 		statText = formatNumber(config.Capacity) .. " Capacity"
 	end

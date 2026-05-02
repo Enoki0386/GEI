@@ -23,11 +23,10 @@ if not remotes then
 end
 
 local requestAttackRemote = remotes:WaitForChild("RequestAttack", 10)
-local equipItemRemote = remotes:WaitForChild("EquipItem", 10)
 local attackFeedbackRemote = remotes:WaitForChild("AttackFeedback", 10)
 local playerData = player:WaitForChild("PlayerData", 10)
 
-if not requestAttackRemote or not equipItemRemote or not playerData then
+if not requestAttackRemote or not playerData then
 	warn("[GEI] ToolClient could not find required remotes or PlayerData.")
 	return
 end
@@ -322,21 +321,6 @@ local function requestAttack()
 	requestAttackRemote:FireServer(target)
 end
 
-local function toggleFirstToolSlot()
-	local ownedTools = playerData:FindFirstChild("OwnedTools")
-	if not ownedTools then
-		return
-	end
-
-	for _, toolId in ipairs(GameData.ToolOrder) do
-		local ownedValue = ownedTools:FindFirstChild(toolId)
-		if ownedValue and ownedValue:IsA("BoolValue") and ownedValue.Value == true then
-			equipItemRemote:FireServer("Tool", toolId, "Toggle")
-			return
-		end
-	end
-end
-
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
@@ -344,8 +328,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		requestAttack()
-	elseif input.KeyCode == Enum.KeyCode.One or input.KeyCode == Enum.KeyCode.KeypadOne then
-		toggleFirstToolSlot()
 	end
 end)
 

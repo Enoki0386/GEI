@@ -257,13 +257,15 @@ Gameplay values are in `src/ReplicatedStorage/GameData.luau`, section:
 
 You can modify:
 
-- maximum Waste Nodes: `GameData.Spawn.MaxWasteNodes`
+- adaptive Waste density: `GameData.Spawn.DensityPerStud`
+- minimum / maximum active Waste Nodes: `GameData.Spawn.MinNodes` and `GameData.Spawn.MaxNodes`
 - spawn speed: `GameData.Spawn.SpawnInterval`
 - Waste HP and rewards: `GameData.WasteTypes`
 - rarity chances: `RarityWeight`
 - Diamond chances: `DiamondChance`
-- tool damage / range / cooldown: `GameData.Tools`
+- tool damage / code-only range / cooldown: `GameData.Tools`
 - backpack capacity: `GameData.Backpacks`
+- player speed: `GameData.Player.WalkSpeed`
 - recommended manual map positions and sizes: `GameData.World`
 - Billboard display distance and HP bar style: `GameData.WasteDisplay`
 - debug test values: `GameData.Debug`
@@ -291,19 +293,21 @@ Fast testing is controlled in `src/ReplicatedStorage/GameData.luau`:
 - Starting Diamonds: `GameData.Debug.StartingDiamonds`
 - Starting Waste: `GameData.Debug.StartingWaste`
 - Tool damage multiplier: `GameData.Debug.ToolDamageMultiplier`
-- Brush damage/cooldown/display range stat: `GameData.Tools.Brush`
+- Brush damage and cooldown: `GameData.Tools.Brush`
+- Player WalkSpeed: `GameData.Player.WalkSpeed`
 - Waste HP/rewards/rarity chances: `GameData.WasteTypes`
 - Shop prices: `GameData.Tools` and `GameData.Backpacks`
 - Spawn rate: `GameData.Spawn.SpawnInterval`
-- Max active Waste: `GameData.Spawn.MaxWasteNodes`
+- Waste density: `GameData.Spawn.DensityPerStud`
+- Min/max active Waste: `GameData.Spawn.MinNodes` and `GameData.Spawn.MaxNodes`
 - Real attack radius formula: `GameData.Interaction`
 - Circle visuals: `GameData.InteractionCircle`
 
-Set `GameData.Debug.Enabled = false` before publication. While it is `true`, player sessions start with the debug Cash/Diamonds/Waste values so you can test the Shop quickly.
+`GameData.Debug.Enabled` is `false` by default, so new test data starts at `0 Cash`, `0 Diamonds`, and `0 Waste`. Temporarily set it to `true` when you want the debug Cash/Diamonds/Waste values for fast Shop testing.
 
 Exact files to edit:
 
-- `src/ReplicatedStorage/GameData.luau`: starting debug values, HP, rewards, tool damage, tool range display stat, shop prices, spawn rate, max Waste count, interaction radius, and circle visuals.
+- `src/ReplicatedStorage/GameData.luau`: starting debug values, HP, rewards, tool damage, code-only tool range, shop prices, spawn rate, Waste density/min/max, interaction radius, and circle visuals.
 - `src/ServerScriptService/Core/PlayerManager.server.luau`: how debug values are applied to player data and how Cash/Diamonds/inventory are stored.
 - `src/ServerScriptService/Systems/WasteNodeManager.server.luau`: how Waste Attributes, HP, rewards, hit feedback, and server attack range are enforced.
 - `src/ServerScriptService/Systems/ShopManager.server.luau`: server validation for purchases and equip requests.

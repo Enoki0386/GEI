@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 pcall(function()
@@ -224,6 +225,13 @@ local function getOwnedTools()
 		return result
 	end
 
+	local equippedToolValue = playerData:FindFirstChild("EquippedTool")
+	local currentToolId = equippedToolValue and equippedToolValue.Value or "Brush"
+	local currentOwnedValue = ownedTools:FindFirstChild(currentToolId)
+	if currentOwnedValue and currentOwnedValue:IsA("BoolValue") and currentOwnedValue.Value == true then
+		return { currentToolId }
+	end
+
 	for _, toolId in ipairs(GameData.ToolOrder) do
 		local ownedValue = ownedTools:FindFirstChild(toolId)
 		if ownedValue and ownedValue:IsA("BoolValue") and ownedValue.Value == true then
@@ -257,6 +265,7 @@ local function refreshToolbar()
 	local isToolEquippedValue = playerData:FindFirstChild("IsToolEquipped")
 	local isToolEquipped = isToolEquippedValue and isToolEquippedValue.Value == true
 	local slotCount = math.max(1, #ownedTools)
+	toolbar.BackgroundTransparency = 0
 	toolbar.Size = UDim2.fromOffset(math.max(112, slotCount * 90 + 20), 88)
 
 	new("UIListLayout", {
@@ -281,8 +290,9 @@ local function refreshToolbar()
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			AutoButtonColor = true,
 			BackgroundColor3 = selected and Color3.fromRGB(43, 50, 55) or Color3.fromRGB(31, 36, 40),
+			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
-			Font = Enum.Font.GothamBold,
+			Font = Enum.Font.GothamBlack,
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = selected and UDim2.fromOffset(72, 66) or UDim2.fromOffset(64, 58),
 			Text = toolConfig.Name,
@@ -309,18 +319,20 @@ local function refreshToolbar()
 
 		local keyBadge = new("TextLabel", {
 			BackgroundColor3 = Color3.fromRGB(14, 17, 20),
+			BackgroundTransparency = 0.35,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamBlack,
-			Position = UDim2.fromOffset(6, 6),
-			Size = UDim2.fromOffset(18, 18),
+			Position = UDim2.fromOffset(5, 5),
+			Size = UDim2.fromOffset(14, 14),
 			Text = tostring(index),
 			TextColor3 = Color3.fromRGB(225, 232, 235),
+			TextTransparency = 0.2,
 			TextScaled = true,
 		}, button)
 		new("UICorner", { CornerRadius = UDim.new(0, 6) }, keyBadge)
 		new("UITextSizeConstraint", {
-			MaxTextSize = 11,
-			MinTextSize = 7,
+			MaxTextSize = 8,
+			MinTextSize = 5,
 		}, keyBadge)
 
 		local colorStrip = new("Frame", {
@@ -339,6 +351,44 @@ local function refreshToolbar()
 		end)
 	end
 end
+
+local keyCodeToSlot = {
+	[Enum.KeyCode.One] = 1,
+	[Enum.KeyCode.Two] = 2,
+	[Enum.KeyCode.Three] = 3,
+	[Enum.KeyCode.Four] = 4,
+	[Enum.KeyCode.Five] = 5,
+	[Enum.KeyCode.Six] = 6,
+	[Enum.KeyCode.Seven] = 7,
+	[Enum.KeyCode.Eight] = 8,
+	[Enum.KeyCode.Nine] = 9,
+	[Enum.KeyCode.KeypadOne] = 1,
+	[Enum.KeyCode.KeypadTwo] = 2,
+	[Enum.KeyCode.KeypadThree] = 3,
+	[Enum.KeyCode.KeypadFour] = 4,
+	[Enum.KeyCode.KeypadFive] = 5,
+	[Enum.KeyCode.KeypadSix] = 6,
+	[Enum.KeyCode.KeypadSeven] = 7,
+	[Enum.KeyCode.KeypadEight] = 8,
+	[Enum.KeyCode.KeypadNine] = 9,
+}
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then
+		return
+	end
+
+	local slotIndex = keyCodeToSlot[input.KeyCode]
+	if not slotIndex then
+		return
+	end
+
+	local tools = getOwnedTools()
+	local toolId = tools[slotIndex]
+	if toolId and equipItemRemote then
+		equipItemRemote:FireServer("Tool", toolId, "Toggle")
+	end
+end)
 
 local function refreshAll()
 	refreshStats()
