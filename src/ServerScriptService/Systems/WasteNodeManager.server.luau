@@ -116,6 +116,23 @@ local function getHorizontalDistance(a, b)
 	return (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
 end
 
+local function vectorFromAttributes(instance, prefix)
+	local x = instance:GetAttribute(prefix .. "X")
+	local y = instance:GetAttribute(prefix .. "Y")
+	local z = instance:GetAttribute(prefix .. "Z")
+	if type(x) == "number" and type(y) == "number" and type(z) == "number" then
+		return Vector3.new(x, y, z)
+	end
+
+	return nil
+end
+
+local function setVectorAttributes(instance, prefix, vector)
+	instance:SetAttribute(prefix .. "X", vector.X)
+	instance:SetAttribute(prefix .. "Y", vector.Y)
+	instance:SetAttribute(prefix .. "Z", vector.Z)
+end
+
 local function calculateInteractionRadius(size)
 	local interactionConfig = GameData.Interaction or {}
 	local halfSurface = math.max(size.X, size.Z) / 2
@@ -168,6 +185,34 @@ local function getVisualYOffset(zoneId, rarity)
 	return 1.55
 end
 
+local function getWasteCenter(wasteModel)
+	local center = vectorFromAttributes(wasteModel, "InteractionCenter")
+	if center then
+		return center
+	end
+
+	local primaryPart = wasteModel.PrimaryPart
+	if primaryPart then
+		return primaryPart.Position
+	end
+
+	return nil
+end
+
+local function getWasteSize(wasteModel)
+	local size = vectorFromAttributes(wasteModel, "InteractionSize")
+	if size then
+		return size
+	end
+
+	local primaryPart = wasteModel.PrimaryPart
+	if primaryPart then
+		return primaryPart.Size
+	end
+
+	return nil
+end
+
 local function hasEquippedNativeTool(player, toolId)
 	local character = player.Character
 	if not character then
@@ -192,8 +237,8 @@ end
 local function isFarFromWaste(position, wasteZone)
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
-			local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-			if hitbox and (hitbox.Position - position).Magnitude < GameData.Spawn.MinDistanceBetweenWaste then
+			local center = getWasteCenter(wasteModel)
+			if center and (center - position).Magnitude < GameData.Spawn.MinDistanceBetweenWaste then
 				return false
 			end
 		end
@@ -243,15 +288,15 @@ local function findSpawnPosition(surface, wasteZone)
 	return nil
 end
 
-local function createBillboard(hitbox, wasteConfig, maxHP)
+local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, boundsSize)
 	local displayConfig = GameData.WasteDisplay
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "WasteBillboard"
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = displayConfig.BillboardMaxDistance
 	billboard.Size = UDim2.fromOffset(displayConfig.BillboardSize.X, displayConfig.BillboardSize.Y)
-	billboard.StudsOffset = Vector3.new(0, hitbox.Size.Y / 2 + 2.1, 0)
-	billboard.Parent = hitbox
+	billboard.StudsOffset = Vector3.new(0, boundsCenter.Y + boundsSize.Y / 2 - primaryPart.Position.Y + 2.1, 0)
+	billboard.Parent = primaryPart
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Frame"
@@ -322,12 +367,12 @@ local function createBillboard(hitbox, wasteConfig, maxHP)
 end
 
 local function updateHPBillboard(wasteModel)
-	local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-	if not hitbox then
+	local primaryPart = wasteModel.PrimaryPart
+	if not primaryPart then
 		return
 	end
 
-	local billboard = hitbox:FindFirstChild("WasteBillboard")
+	local billboard = primaryPart:FindFirstChild("WasteBillboard")
 	local frame = billboard and billboard:FindFirstChild("Frame")
 	local hpLabel = frame and frame:FindFirstChild("HPLabel")
 	local barBack = frame and frame:FindFirstChild("HPBarBack")
@@ -344,19 +389,21 @@ local function updateHPBillboard(wasteModel)
 	end
 end
 
-local function createRangeRing(wasteModel, hitbox, wasteConfig)
+local function createRangeRing(wasteModel, boundsCenter, boundsSize, wasteConfig)
 	local ringConfig = GameData.InteractionCircle
 	local ringFolder = Instance.new("Folder")
 	ringFolder.Name = "RangeRing"
 	ringFolder.Parent = wasteModel
 
-	local radius = calculateInteractionRadius(hitbox.Size)
+	local radius = calculateInteractionRadius(boundsSize)
 	local segmentCount = ringConfig.SegmentCount
 	local segmentLength = ((math.pi * 2 * radius) / segmentCount) * ringConfig.SegmentLengthRatio
-	local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + ringConfig.HeightOffset, hitbox.Position.Z)
+	local center = Vector3.new(boundsCenter.X, boundsCenter.Y - boundsSize.Y / 2 + ringConfig.HeightOffset, boundsCenter.Z)
 
 	wasteModel:SetAttribute("InteractionRadius", radius)
 	wasteModel:SetAttribute("RingSegmentCount", segmentCount)
+	setVectorAttributes(wasteModel, "InteractionCenter", boundsCenter)
+	setVectorAttributes(wasteModel, "InteractionSize", boundsSize)
 
 	for index = 1, segmentCount do
 		local angle = ((index - 1) / segmentCount) * math.pi * 2
@@ -380,6 +427,20 @@ local function createRangeRing(wasteModel, hitbox, wasteConfig)
 	end
 end
 
+local function hasBasePart(instance)
+	if instance:IsA("BasePart") then
+		return true
+	end
+
+	for _, descendant in ipairs(instance:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function getWasteVisualSource(wasteConfig)
 	if type(wasteConfig.ModelName) ~= "string" or wasteConfig.ModelName == "" then
 		return nil
@@ -394,22 +455,16 @@ local function getWasteVisualSource(wasteConfig)
 	local variants = {}
 	if root:IsA("Folder") then
 		for _, child in ipairs(root:GetChildren()) do
-			if child:IsA("Model") or child:IsA("BasePart") or child:IsA("Folder") then
+			if (child:IsA("Model") or child:IsA("BasePart") or child:IsA("Folder")) and hasBasePart(child) then
 				table.insert(variants, child)
 			end
 		end
 
-		if #variants == 0 then
+		if #variants == 0 and hasBasePart(root) then
 			return root
 		end
 	elseif root:IsA("Model") then
-		for _, child in ipairs(root:GetChildren()) do
-			if child:IsA("Model") or child:IsA("Folder") then
-				table.insert(variants, child)
-			end
-		end
-
-		if #variants == 0 then
+		if hasBasePart(root) then
 			return root
 		end
 	elseif root:IsA("BasePart") then
@@ -426,114 +481,191 @@ end
 local function setVisualPartProperties(instance)
 	if instance:IsA("BasePart") then
 		instance.Anchored = true
-		instance.CanCollide = false
-		instance.CanQuery = false
-		instance.CanTouch = false
+		instance.CanCollide = true
+		instance.CanQuery = true
+		instance.CanTouch = true
 	end
 
 	for _, descendant in ipairs(instance:GetDescendants()) do
 		if descendant:IsA("BasePart") then
 			descendant.Anchored = true
-			descendant.CanCollide = false
-			descendant.CanQuery = false
-			descendant.CanTouch = false
+			descendant.CanCollide = true
+			descendant.CanQuery = true
+			descendant.CanTouch = true
 		end
 	end
 end
 
-local function pivotVisualToGround(visual, hitbox, zoneId, rarity)
+local function pivotVisualToSpawn(visual, spawnPosition, zoneId, rarity)
 	local yOffset = getVisualYOffset(zoneId, rarity)
-	local groundY = hitbox.Position.Y - hitbox.Size.Y / 2
-	local targetCFrame = CFrame.new(hitbox.Position.X, groundY + yOffset, hitbox.Position.Z)
+	local targetCFrame = CFrame.new(spawnPosition.X, spawnPosition.Y + yOffset, spawnPosition.Z)
 
 	if visual:IsA("Model") then
 		visual:PivotTo(targetCFrame)
 	elseif visual:IsA("BasePart") then
 		visual.CFrame = targetCFrame
 	end
+
+	return yOffset
 end
 
-local function createConfiguredVisual(wasteModel, hitbox, wasteConfig, zoneId)
+local function choosePrimaryPart(visual)
+	if visual:IsA("BasePart") then
+		return visual
+	end
+
+	if visual:IsA("Model") and visual.PrimaryPart then
+		return visual.PrimaryPart
+	end
+
+	local largestPart = nil
+	local largestVolume = -math.huge
+	for _, descendant in ipairs(visual:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			local volume = descendant.Size.X * descendant.Size.Y * descendant.Size.Z
+			if volume > largestVolume then
+				largestVolume = volume
+				largestPart = descendant
+			end
+		end
+	end
+
+	if visual:IsA("Model") and largestPart then
+		visual.PrimaryPart = largestPart
+	end
+
+	return largestPart
+end
+
+local function getVisualBounds(visual)
+	if visual:IsA("Model") then
+		local cframe, size = visual:GetBoundingBox()
+		return cframe, size
+	elseif visual:IsA("BasePart") then
+		return visual.CFrame, visual.Size
+	end
+
+	return CFrame.new(), Vector3.new(1, 1, 1)
+end
+
+local function cloneFolderAsModel(source)
+	local visualModel = Instance.new("Model")
+	visualModel.Name = "VisualModel"
+
+	local sourceClone = source:Clone()
+	for _, child in ipairs(sourceClone:GetChildren()) do
+		child.Parent = visualModel
+	end
+	sourceClone:Destroy()
+
+	return visualModel
+end
+
+local function createConfiguredVisual(wasteModel, spawnPosition, wasteConfig, zoneId)
 	local source = getWasteVisualSource(wasteConfig)
 	if not source then
-		return false
+		return nil
 	end
 
+	local visual = nil
 	if source:IsA("BasePart") then
-		local visualPart = source:Clone()
-		visualPart.Name = "VisualModel"
-		visualPart.Parent = wasteModel
-		setVisualPartProperties(visualPart)
-		pivotVisualToGround(visualPart, hitbox, zoneId, wasteConfig.Rarity)
+		visual = source:Clone()
+		visual.Name = "VisualModel"
 	elseif source:IsA("Model") then
-		local visualModel = source:Clone()
-		visualModel.Name = "VisualModel"
-		visualModel.Parent = wasteModel
-		setVisualPartProperties(visualModel)
-		pivotVisualToGround(visualModel, hitbox, zoneId, wasteConfig.Rarity)
+		visual = source:Clone()
+		visual.Name = "VisualModel"
 	elseif source:IsA("Folder") then
-		local visualModel = Instance.new("Model")
-		visualModel.Name = "VisualModel"
-
-		local sourceClone = source:Clone()
-		for _, child in ipairs(sourceClone:GetChildren()) do
-			child.Parent = visualModel
-		end
-		sourceClone:Destroy()
-
-		visualModel.Parent = wasteModel
-		setVisualPartProperties(visualModel)
-		pivotVisualToGround(visualModel, hitbox, zoneId, wasteConfig.Rarity)
+		visual = cloneFolderAsModel(source)
 	else
-		return false
+		return nil
 	end
 
-	hitbox.Transparency = 1
-	return true
+	visual.Parent = wasteModel
+	setVisualPartProperties(visual)
+
+	local yOffset = pivotVisualToSpawn(visual, spawnPosition, zoneId, wasteConfig.Rarity)
+	local primaryPart = choosePrimaryPart(visual)
+	if not primaryPart then
+		visual:Destroy()
+		return nil
+	end
+
+	local boundsCFrame, boundsSize = getVisualBounds(visual)
+	print(string.format(
+		"[WasteSpawn] Spawned %s using model %s at Y offset %.3f",
+		wasteConfig.Id,
+		source.Name,
+		yOffset
+	))
+
+	return {
+		Instance = visual,
+		PrimaryPart = primaryPart,
+		BoundsCFrame = boundsCFrame,
+		BoundsSize = boundsSize,
+		ModelName = source.Name,
+		YOffset = yOffset,
+	}
 end
 
-local function createFallbackVisual(wasteModel, hitbox, wasteConfig)
-	local accent = Instance.new("Part")
-	accent.Name = "Accent"
-	accent.Anchored = true
-	accent.CanCollide = false
-	accent.CanTouch = false
-	accent.Color = wasteConfig.AccentColor
-	accent.Material = Enum.Material.SmoothPlastic
-	accent.Position = hitbox.Position + Vector3.new(0.6, hitbox.Size.Y * 0.3, -0.4)
-	accent.Shape = Enum.PartType.Ball
-	accent.Size = hitbox.Size * 0.42
-	accent.Parent = wasteModel
+local function createFallbackVisual(wasteModel, spawnPosition, wasteConfig, zoneId)
+	local visualPart = Instance.new("Part")
+	visualPart.Name = "VisualModel"
+	visualPart.Anchored = true
+	visualPart.CanCollide = true
+	visualPart.CanQuery = true
+	visualPart.CanTouch = true
+	visualPart.Color = wasteConfig.Color
+	visualPart.Material = Enum.Material.SmoothPlastic
+	visualPart.Shape = Enum.PartType.Ball
+	visualPart.Size = wasteConfig.VisualSize
+	visualPart.Parent = wasteModel
+
+	local yOffset = pivotVisualToSpawn(visualPart, spawnPosition, zoneId, wasteConfig.Rarity)
+	print(string.format(
+		"[WasteSpawn] Spawned %s using fallback VisualModel at Y offset %.3f",
+		wasteConfig.Id,
+		yOffset
+	))
+
+	return {
+		Instance = visualPart,
+		PrimaryPart = visualPart,
+		BoundsCFrame = visualPart.CFrame,
+		BoundsSize = visualPart.Size,
+		ModelName = "fallback VisualModel",
+		YOffset = yOffset,
+	}
 end
 
 local function playHitFeedback(wasteModel)
 	local displayConfig = GameData.WasteDisplay
-	local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-	if not hitbox then
+	local primaryPart = wasteModel.PrimaryPart
+	if not primaryPart then
 		return
 	end
 
-	local baseSize = hitbox:GetAttribute("BaseSize") or hitbox.Size
-	hitbox:SetAttribute("BaseSize", baseSize)
+	local baseSize = primaryPart:GetAttribute("BaseSize") or primaryPart.Size
+	primaryPart:SetAttribute("BaseSize", baseSize)
 
-	local originalCFrame = hitbox.CFrame
+	local originalCFrame = primaryPart.CFrame
 	local offset = Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-1, 1))
 	if offset.Magnitude > 0 then
 		offset = offset.Unit * displayConfig.HitShakeDistance
 	end
 
-	local outTween = TweenService:Create(hitbox, TweenInfo.new(displayConfig.HitTweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	local outTween = TweenService:Create(primaryPart, TweenInfo.new(displayConfig.HitTweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		CFrame = originalCFrame + offset,
 		Size = baseSize * displayConfig.HitScaleAmount,
 	})
-	local inTween = TweenService:Create(hitbox, TweenInfo.new(displayConfig.HitTweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+	local inTween = TweenService:Create(primaryPart, TweenInfo.new(displayConfig.HitTweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 		CFrame = originalCFrame,
 		Size = baseSize,
 	})
 
 	outTween:Play()
 	outTween.Completed:Connect(function()
-		if hitbox.Parent then
+		if primaryPart.Parent then
 			inTween:Play()
 		end
 	end)
@@ -549,21 +681,21 @@ local function playHitFeedback(wasteModel)
 
 	local particles = Instance.new("ParticleEmitter")
 	particles.Name = "WasteHitParticles"
-	particles.Color = ColorSequence.new(hitbox.Color)
+	particles.Color = ColorSequence.new(primaryPart.Color)
 	particles.Enabled = false
 	particles.LightEmission = 0.35
 	particles.Lifetime = NumberRange.new(0.16, 0.28)
 	particles.Rate = 0
 	particles.Speed = NumberRange.new(4, 8)
 	particles.SpreadAngle = Vector2.new(45, 45)
-	particles.Parent = hitbox
+	particles.Parent = primaryPart
 	particles:Emit(10)
 	Debris:AddItem(particles, 0.5)
 end
 
 local function playDestroyFeedback(wasteModel)
-	local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-	if not hitbox then
+	local primaryPart = wasteModel.PrimaryPart
+	if not primaryPart then
 		return
 	end
 
@@ -575,12 +707,12 @@ local function playDestroyFeedback(wasteModel)
 	effectPart.CanTouch = false
 	effectPart.Transparency = 1
 	effectPart.Size = Vector3.new(1, 1, 1)
-	effectPart.CFrame = hitbox.CFrame
+	effectPart.CFrame = primaryPart.CFrame
 	effectPart.Parent = Workspace
 
 	local burst = Instance.new("ParticleEmitter")
 	burst.Name = "WasteDestroyBurst"
-	burst.Color = ColorSequence.new(hitbox.Color)
+	burst.Color = ColorSequence.new(primaryPart.Color)
 	burst.Enabled = false
 	burst.LightEmission = 0.55
 	burst.Lifetime = NumberRange.new(0.28, 0.45)
@@ -594,8 +726,6 @@ end
 
 local function createWasteNode(spawnPosition, wasteZone, surface)
 	local wasteId, wasteConfig = GameData.GetRandomWasteType(random)
-	local size = wasteConfig.VisualSize
-	local hitboxPosition = spawnPosition + Vector3.new(0, size.Y / 2, 0)
 	local maxHP = getRandomHPForWaste(wasteConfig)
 	local rewardWaste = getRewardWasteForHP(wasteConfig, maxHP)
 	local zoneId = getZoneId(surface)
@@ -616,24 +746,19 @@ local function createWasteNode(spawnPosition, wasteZone, surface)
 	model:SetAttribute("DiamondChance", wasteConfig.DiamondChance)
 	model:SetAttribute("DiamondReward", wasteConfig.DiamondReward)
 
-	local hitbox = Instance.new("Part")
-	hitbox.Name = "Hitbox"
-	hitbox.Anchored = true
-	hitbox.CanCollide = true
-	hitbox.CanTouch = false
-	hitbox.Color = wasteConfig.Color
-	hitbox.Material = Enum.Material.SmoothPlastic
-	hitbox.Position = hitboxPosition
-	hitbox.Shape = Enum.PartType.Ball
-	hitbox.Size = size
-	hitbox.Parent = model
-
-	model.PrimaryPart = hitbox
-	if not createConfiguredVisual(model, hitbox, wasteConfig, zoneId) then
-		createFallbackVisual(model, hitbox, wasteConfig)
+	local visualInfo = createConfiguredVisual(model, spawnPosition, wasteConfig, zoneId)
+	if not visualInfo then
+		visualInfo = createFallbackVisual(model, spawnPosition, wasteConfig, zoneId)
 	end
-	createBillboard(hitbox, wasteConfig, maxHP)
-	createRangeRing(model, hitbox, wasteConfig)
+
+	model.PrimaryPart = visualInfo.PrimaryPart
+	setVectorAttributes(model, "InteractionCenter", visualInfo.BoundsCFrame.Position)
+	setVectorAttributes(model, "InteractionSize", visualInfo.BoundsSize)
+	model:SetAttribute("VisualModelName", visualInfo.ModelName)
+	model:SetAttribute("VisualYOffset", visualInfo.YOffset)
+
+	createBillboard(visualInfo.PrimaryPart, wasteConfig, maxHP, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize)
+	createRangeRing(model, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize, wasteConfig)
 	model.Parent = wasteZone
 	CollectionService:AddTag(model, "WasteNode")
 end
@@ -664,8 +789,10 @@ local function handleAttack(player, target)
 		return
 	end
 
-	local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-	if not hitbox then
+	local primaryPart = wasteModel.PrimaryPart
+	local boundsCenter = getWasteCenter(wasteModel)
+	local boundsSize = getWasteSize(wasteModel)
+	if not primaryPart or not boundsCenter or not boundsSize then
 		return
 	end
 
@@ -711,8 +838,8 @@ local function handleAttack(player, target)
 		return
 	end
 
-	local interactionRadius = wasteModel:GetAttribute("InteractionRadius") or calculateInteractionRadius(hitbox.Size)
-	local distance = getHorizontalDistance(root.Position, hitbox.Position)
+	local interactionRadius = wasteModel:GetAttribute("InteractionRadius") or calculateInteractionRadius(boundsSize)
+	local distance = getHorizontalDistance(root.Position, boundsCenter)
 	if distance > interactionRadius then
 		fireClient(player, "AttackFeedback", {
 			Target = wasteModel,

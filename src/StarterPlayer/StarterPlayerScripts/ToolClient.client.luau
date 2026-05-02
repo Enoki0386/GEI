@@ -78,9 +78,40 @@ local function getHorizontalDistance(a, b)
 	return (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
 end
 
-local function calculateFallbackInteractionRadius(hitbox)
+local function vectorFromAttributes(instance, prefix)
+	local x = instance:GetAttribute(prefix .. "X")
+	local y = instance:GetAttribute(prefix .. "Y")
+	local z = instance:GetAttribute(prefix .. "Z")
+	if type(x) == "number" and type(y) == "number" and type(z) == "number" then
+		return Vector3.new(x, y, z)
+	end
+
+	return nil
+end
+
+local function getWasteCenter(wasteModel)
+	local center = vectorFromAttributes(wasteModel, "InteractionCenter")
+	if center then
+		return center
+	end
+
+	local primaryPart = wasteModel.PrimaryPart
+	return primaryPart and primaryPart.Position or nil
+end
+
+local function getWasteSize(wasteModel)
+	local size = vectorFromAttributes(wasteModel, "InteractionSize")
+	if size then
+		return size
+	end
+
+	local primaryPart = wasteModel.PrimaryPart
+	return primaryPart and primaryPart.Size or nil
+end
+
+local function calculateFallbackInteractionRadius(size)
 	local interactionConfig = GameData.Interaction or {}
-	local halfSurface = math.max(hitbox.Size.X, hitbox.Size.Z) / 2
+	local halfSurface = math.max(size.X, size.Z) / 2
 	local extraRange = interactionConfig.ExtraRangeFromSurface or 2.5
 	local minRange = interactionConfig.MinRange or 4
 	local maxRange = interactionConfig.MaxRange or 12
@@ -108,8 +139,9 @@ local function isWasteAttackable(wasteModel, root)
 		return false
 	end
 
-	local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-	if not hitbox then
+	local center = getWasteCenter(wasteModel)
+	local size = getWasteSize(wasteModel)
+	if not center or not size then
 		return false
 	end
 
@@ -118,8 +150,8 @@ local function isWasteAttackable(wasteModel, root)
 		return false
 	end
 
-	local interactionRadius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(hitbox)
-	return getHorizontalDistance(root.Position, hitbox.Position) <= interactionRadius
+	local interactionRadius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(size)
+	return getHorizontalDistance(root.Position, center) <= interactionRadius
 end
 
 local function findNearestWaste()
@@ -139,10 +171,10 @@ local function findNearestWaste()
 
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
-			local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-			if hitbox and isWasteAttackable(wasteModel, root) then
-				local playerDistance = getHorizontalDistance(root.Position, hitbox.Position)
-				local mouseDistance = (mousePosition - hitbox.Position).Magnitude
+			local center = getWasteCenter(wasteModel)
+			if center and isWasteAttackable(wasteModel, root) then
+				local playerDistance = getHorizontalDistance(root.Position, center)
+				local mouseDistance = (mousePosition - center).Magnitude
 				local score = playerDistance + mouseDistance * 0.25
 				if score < bestScore then
 					bestScore = score
@@ -338,8 +370,7 @@ if attackFeedbackRemote then
 	attackFeedbackRemote.OnClientEvent:Connect(function(feedback)
 		if type(feedback) == "table" and feedback.Target then
 			if SoundUtil then
-				local hitbox = feedback.Target.PrimaryPart or feedback.Target:FindFirstChild("Hitbox")
-				SoundUtil.Play(feedback.Destroyed and "WasteBreak" or "WasteHit", GameData, hitbox)
+				SoundUtil.Play(feedback.Destroyed and "WasteBreak" or "WasteHit", GameData, feedback.Target.PrimaryPart)
 			end
 			playTargetFlash(feedback.Target)
 		end
@@ -358,15 +389,16 @@ RunService.RenderStepped:Connect(function()
 
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
-			local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
+			local center = getWasteCenter(wasteModel)
+			local size = getWasteSize(wasteModel)
 			local ring = wasteModel:FindFirstChild("RangeRing")
-			if hitbox and ring then
-				local distanceToWaste = getHorizontalDistance(root.Position, hitbox.Position)
+			if center and size and ring then
+				local distanceToWaste = getHorizontalDistance(root.Position, center)
 				local visible = distanceToWaste <= ringConfig.DisplayDistance
-				local radius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(hitbox)
+				local radius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(size)
 				local inRange = distanceToWaste <= radius
 				local visualRadius = radius
-				local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + ringConfig.HeightOffset, hitbox.Position.Z)
+				local ringCenter = Vector3.new(center.X, center.Y - size.Y / 2 + ringConfig.HeightOffset, center.Z)
 
 				for _, segment in ipairs(ring:GetChildren()) do
 					if segment:IsA("BasePart") then
@@ -383,7 +415,7 @@ RunService.RenderStepped:Connect(function()
 						)
 						segment.Color = inRange and ringConfig.InRangeColor or ringConfig.Color
 						segment.Transparency = visible and (inRange and ringConfig.InRangeTransparency or ringConfig.IdleTransparency) or 1
-						segment.CFrame = CFrame.new(center + Vector3.new(math.cos(angle) * visualRadius, 0, math.sin(angle) * visualRadius))
+						segment.CFrame = CFrame.new(ringCenter + Vector3.new(math.cos(angle) * visualRadius, 0, math.sin(angle) * visualRadius))
 							* CFrame.Angles(0, -angle - math.pi / 2, 0)
 					end
 				end
