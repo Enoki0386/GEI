@@ -125,6 +125,27 @@ local function calculateInteractionRadius(size)
 	return math.clamp(halfSurface + extraRange, minRange, maxRange)
 end
 
+local function getRandomHPForWaste(wasteConfig)
+	local hpRanges = GameData.WasteHPByRarity or {}
+	local range = hpRanges[wasteConfig.Rarity]
+	if range and type(range.Min) == "number" and type(range.Max) == "number" then
+		local minHP = math.floor(math.min(range.Min, range.Max))
+		local maxHP = math.floor(math.max(range.Min, range.Max))
+		return random:NextInteger(minHP, maxHP)
+	end
+
+	return math.max(1, math.floor(wasteConfig.MaxHP or 1))
+end
+
+local function getRewardWasteForHP(wasteConfig, maxHP)
+	local rewardPerHP = wasteConfig.WasteRewardPerHP
+	if type(rewardPerHP) == "number" then
+		return math.max(1, math.floor(maxHP * rewardPerHP + 0.5))
+	end
+
+	return math.max(1, math.floor(wasteConfig.WasteReward or 1))
+end
+
 local function hasEquippedNativeTool(player, toolId)
 	local character = player.Character
 	if not character then
@@ -200,7 +221,7 @@ local function findSpawnPosition(surface, wasteZone)
 	return nil
 end
 
-local function createBillboard(hitbox, wasteConfig)
+local function createBillboard(hitbox, wasteConfig, maxHP)
 	local displayConfig = GameData.WasteDisplay
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "WasteBillboard"
@@ -244,7 +265,7 @@ local function createBillboard(hitbox, wasteConfig)
 	hpLabel.Font = Enum.Font.GothamBlack
 	hpLabel.Position = UDim2.fromOffset(8, 28)
 	hpLabel.Size = UDim2.new(1, -16, 0, 26)
-	hpLabel.Text = tostring(wasteConfig.MaxHP)
+	hpLabel.Text = tostring(maxHP)
 	hpLabel.TextColor3 = Color3.fromRGB(242, 246, 248)
 	hpLabel.TextScaled = true
 	hpLabel.Parent = frame
@@ -337,28 +358,109 @@ local function createRangeRing(wasteModel, hitbox, wasteConfig)
 	end
 end
 
-local function createConfiguredVisual(wasteModel, hitbox, wasteConfig)
+local function getWasteVisualSource(wasteConfig)
 	if type(wasteConfig.ModelName) ~= "string" or wasteConfig.ModelName == "" then
-		return false
+		return nil
 	end
 
 	local modelsFolder = ReplicatedStorage:FindFirstChild("WasteModels")
-	local sourceModel = modelsFolder and modelsFolder:FindFirstChild(wasteConfig.ModelName)
-	if not sourceModel or not sourceModel:IsA("Model") then
-		return false
+	local root = modelsFolder and modelsFolder:FindFirstChild(wasteConfig.ModelName)
+	if not root then
+		return nil
 	end
 
-	local visualModel = sourceModel:Clone()
-	visualModel.Name = "VisualModel"
-	visualModel.Parent = wasteModel
-	visualModel:PivotTo(CFrame.new(hitbox.Position))
+	local variants = {}
+	if root:IsA("Folder") then
+		for _, child in ipairs(root:GetChildren()) do
+			if child:IsA("Model") or child:IsA("BasePart") or child:IsA("Folder") then
+				table.insert(variants, child)
+			end
+		end
+	elseif root:IsA("Model") then
+		for _, child in ipairs(root:GetChildren()) do
+			if child:IsA("Model") or child:IsA("Folder") then
+				table.insert(variants, child)
+			end
+		end
 
-	for _, descendant in ipairs(visualModel:GetDescendants()) do
+		if #variants == 0 then
+			return root
+		end
+	elseif root:IsA("BasePart") then
+		return root
+	end
+
+	if #variants == 0 then
+		return nil
+	end
+
+	return variants[random:NextInteger(1, #variants)]
+end
+
+local function setVisualPartProperties(instance)
+	if instance:IsA("BasePart") then
+		instance.Anchored = true
+		instance.CanCollide = false
+		instance.CanQuery = false
+		instance.CanTouch = false
+	end
+
+	for _, descendant in ipairs(instance:GetDescendants()) do
 		if descendant:IsA("BasePart") then
 			descendant.Anchored = true
 			descendant.CanCollide = false
+			descendant.CanQuery = false
 			descendant.CanTouch = false
 		end
+	end
+end
+
+local function pivotVisualToGround(visual, hitbox)
+	local visualConfig = GameData.WasteVisual or {}
+	local yOffset = visualConfig.ModelYOffset or 1.55
+	local groundY = hitbox.Position.Y - hitbox.Size.Y / 2
+	local targetCFrame = CFrame.new(hitbox.Position.X, groundY + yOffset, hitbox.Position.Z)
+
+	if visual:IsA("Model") then
+		visual:PivotTo(targetCFrame)
+	elseif visual:IsA("BasePart") then
+		visual.CFrame = targetCFrame
+	end
+end
+
+local function createConfiguredVisual(wasteModel, hitbox, wasteConfig)
+	local source = getWasteVisualSource(wasteConfig)
+	if not source then
+		return false
+	end
+
+	if source:IsA("BasePart") then
+		local visualPart = source:Clone()
+		visualPart.Name = "VisualModel"
+		visualPart.Parent = wasteModel
+		setVisualPartProperties(visualPart)
+		pivotVisualToGround(visualPart, hitbox)
+	elseif source:IsA("Model") then
+		local visualModel = source:Clone()
+		visualModel.Name = "VisualModel"
+		visualModel.Parent = wasteModel
+		setVisualPartProperties(visualModel)
+		pivotVisualToGround(visualModel, hitbox)
+	elseif source:IsA("Folder") then
+		local visualModel = Instance.new("Model")
+		visualModel.Name = "VisualModel"
+
+		local sourceClone = source:Clone()
+		for _, child in ipairs(sourceClone:GetChildren()) do
+			child.Parent = visualModel
+		end
+		sourceClone:Destroy()
+
+		visualModel.Parent = wasteModel
+		setVisualPartProperties(visualModel)
+		pivotVisualToGround(visualModel, hitbox)
+	else
+		return false
 	end
 
 	hitbox.Transparency = 1
@@ -469,6 +571,8 @@ local function createWasteNode(spawnPosition, wasteZone)
 	local wasteId, wasteConfig = GameData.GetRandomWasteType(random)
 	local size = wasteConfig.VisualSize
 	local hitboxPosition = spawnPosition + Vector3.new(0, size.Y / 2, 0)
+	local maxHP = getRandomHPForWaste(wasteConfig)
+	local rewardWaste = getRewardWasteForHP(wasteConfig, maxHP)
 
 	local model = Instance.new("Model")
 	model.Name = wasteConfig.Name
@@ -477,10 +581,10 @@ local function createWasteNode(spawnPosition, wasteZone)
 	model:SetAttribute("WasteType", wasteId)
 	model:SetAttribute("ModelName", wasteConfig.ModelName or "")
 	model:SetAttribute("Rarity", wasteConfig.Rarity)
-	model:SetAttribute("CurrentHP", wasteConfig.MaxHP)
-	model:SetAttribute("MaxHP", wasteConfig.MaxHP)
-	model:SetAttribute("WasteReward", wasteConfig.WasteReward)
-	model:SetAttribute("RewardWaste", wasteConfig.WasteReward)
+	model:SetAttribute("CurrentHP", maxHP)
+	model:SetAttribute("MaxHP", maxHP)
+	model:SetAttribute("WasteReward", rewardWaste)
+	model:SetAttribute("RewardWaste", rewardWaste)
 	model:SetAttribute("RewardCash", 0)
 	model:SetAttribute("DiamondChance", wasteConfig.DiamondChance)
 	model:SetAttribute("DiamondReward", wasteConfig.DiamondReward)
@@ -501,7 +605,7 @@ local function createWasteNode(spawnPosition, wasteZone)
 	if not createConfiguredVisual(model, hitbox, wasteConfig) then
 		createFallbackVisual(model, hitbox, wasteConfig)
 	end
-	createBillboard(hitbox, wasteConfig)
+	createBillboard(hitbox, wasteConfig, maxHP)
 	createRangeRing(model, hitbox, wasteConfig)
 	model.Parent = wasteZone
 	CollectionService:AddTag(model, "WasteNode")

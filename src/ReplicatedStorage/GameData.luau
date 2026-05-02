@@ -36,6 +36,29 @@ GameData.WasteDisplay = {
 	HitTweenTime = 0.08,
 }
 
+GameData.WasteVisual = {
+	ModelYOffset = 1.55,
+}
+
+GameData.WasteHPByRarity = {
+	Common = {
+		Min = 15,
+		Max = 30,
+	},
+	Rare = {
+		Min = 60,
+		Max = 90,
+	},
+	Epic = {
+		Min = 150,
+		Max = 230,
+	},
+	Legendary = {
+		Min = 400,
+		Max = 650,
+	},
+}
+
 GameData.Interaction = {
 	ExtraRangeFromSurface = 2.5,
 	MinRange = 3.5,
@@ -105,8 +128,10 @@ GameData.World = {
 
 GameData.ToolOrder = {
 	"Brush",
+	"Broom",
+	"Vacuum",
+	"Hammer",
 	"Crusher",
-	"VacuumWand",
 }
 
 GameData.Tools = {
@@ -127,38 +152,72 @@ GameData.Tools = {
 			SwingOffset = CFrame.new(0.1, -0.15, -0.55) * CFrame.Angles(math.rad(-35), math.rad(0), math.rad(-18)),
 		},
 	},
+	Broom = {
+		Id = "Broom",
+		Name = "Broom",
+		Price = 150,
+		Damage = 16,
+		Range = 19,
+		Cooldown = 0.43,
+		Color = Color3.fromRGB(98, 184, 126),
+		Description = "A wider sweep for clearing early piles faster.",
+		ModelName = "Broom",
+		Visual = {
+			HandleColor = Color3.fromRGB(130, 91, 56),
+			BristleColor = Color3.fromRGB(98, 184, 126),
+			GripOffset = CFrame.new(0.6, -0.72, -0.36) * CFrame.Angles(math.rad(-68), math.rad(14), math.rad(10)),
+			SwingOffset = CFrame.new(0.12, -0.16, -0.58) * CFrame.Angles(math.rad(-38), math.rad(0), math.rad(-18)),
+		},
+	},
+	Vacuum = {
+		Id = "Vacuum",
+		Name = "Vacuum",
+		Price = 650,
+		Damage = 34,
+		Range = 21,
+		Cooldown = 0.4,
+		Color = Color3.fromRGB(95, 211, 210),
+		Description = "A focused vacuum that pulls through tougher trash.",
+		ModelName = "Vacuum",
+		Visual = {
+			HandleColor = Color3.fromRGB(55, 73, 92),
+			BristleColor = Color3.fromRGB(95, 211, 210),
+			GripOffset = CFrame.new(0.58, -0.72, -0.36) * CFrame.Angles(math.rad(-72), math.rad(16), math.rad(12)),
+			SwingOffset = CFrame.new(0.1, -0.14, -0.65) * CFrame.Angles(math.rad(-30), math.rad(0), math.rad(-16)),
+		},
+	},
+	Hammer = {
+		Id = "Hammer",
+		Name = "Hammer",
+		Price = 1600,
+		Damage = 70,
+		Range = 20,
+		Cooldown = 0.55,
+		Color = Color3.fromRGB(247, 190, 80),
+		Description = "A heavy hammer for smashing dense waste piles.",
+		ModelName = "Hammer",
+		Visual = {
+			HandleColor = Color3.fromRGB(95, 98, 104),
+			BristleColor = Color3.fromRGB(247, 190, 80),
+			GripOffset = CFrame.new(0.62, -0.7, -0.34) * CFrame.Angles(math.rad(-66), math.rad(10), math.rad(8)),
+			SwingOffset = CFrame.new(0.14, -0.18, -0.6) * CFrame.Angles(math.rad(-42), math.rad(0), math.rad(-20)),
+		},
+	},
 	Crusher = {
 		Id = "Crusher",
 		Name = "Crusher",
-		Price = 250,
-		Damage = 22,
-		Range = 20,
+		Price = 4200,
+		Damage = 130,
+		Range = 22,
 		Cooldown = 0.5,
 		Color = Color3.fromRGB(237, 103, 88),
-		Description = "A heavier cleaner that breaks tougher piles faster.",
+		Description = "A powerful late-game cleaner for massive piles.",
 		ModelName = "Crusher",
 		Visual = {
 			HandleColor = Color3.fromRGB(95, 98, 104),
 			BristleColor = Color3.fromRGB(237, 103, 88),
 			GripOffset = CFrame.new(0.6, -0.72, -0.36) * CFrame.Angles(math.rad(-68), math.rad(14), math.rad(10)),
 			SwingOffset = CFrame.new(0.12, -0.16, -0.58) * CFrame.Angles(math.rad(-38), math.rad(0), math.rad(-18)),
-		},
-	},
-	VacuumWand = {
-		Id = "VacuumWand",
-		Name = "Vacuum Wand",
-		Price = 1200,
-		Damage = 55,
-		Range = 24,
-		Cooldown = 0.42,
-		Color = Color3.fromRGB(95, 211, 210),
-		Description = "A focused cleanup wand with strong power.",
-		ModelName = "VacuumWand",
-		Visual = {
-			HandleColor = Color3.fromRGB(55, 73, 92),
-			BristleColor = Color3.fromRGB(95, 211, 210),
-			GripOffset = CFrame.new(0.58, -0.72, -0.36) * CFrame.Angles(math.rad(-72), math.rad(16), math.rad(12)),
-			SwingOffset = CFrame.new(0.1, -0.14, -0.65) * CFrame.Angles(math.rad(-30), math.rad(0), math.rad(-16)),
 		},
 	},
 }
@@ -203,6 +262,7 @@ GameData.WasteOrder = {
 	"CommonWaste",
 	"RareWaste",
 	"EpicWaste",
+	"LegendaryWaste",
 }
 
 GameData.WasteTypes = {
@@ -211,8 +271,9 @@ GameData.WasteTypes = {
 		Name = "Common Waste",
 		Rarity = "Common",
 		RarityWeight = 72,
-		MaxHP = 25,
+		MaxHP = 30,
 		WasteReward = 5,
+		WasteRewardPerHP = 0.24,
 		DiamondChance = 0.03,
 		DiamondReward = 1,
 		Color = Color3.fromRGB(112, 156, 85),
@@ -225,8 +286,9 @@ GameData.WasteTypes = {
 		Name = "Rare Waste",
 		Rarity = "Rare",
 		RarityWeight = 23,
-		MaxHP = 80,
+		MaxHP = 90,
 		WasteReward = 18,
+		WasteRewardPerHP = 0.25,
 		DiamondChance = 0.12,
 		DiamondReward = 1,
 		Color = Color3.fromRGB(77, 142, 210),
@@ -238,15 +300,31 @@ GameData.WasteTypes = {
 		Id = "EpicWaste",
 		Name = "Epic Waste",
 		Rarity = "Epic",
-		RarityWeight = 5,
-		MaxHP = 200,
+		RarityWeight = 4.5,
+		MaxHP = 230,
 		WasteReward = 50,
+		WasteRewardPerHP = 0.28,
 		DiamondChance = 0.3,
 		DiamondReward = 3,
 		Color = Color3.fromRGB(145, 86, 211),
 		AccentColor = Color3.fromRGB(222, 171, 255),
 		VisualSize = Vector3.new(6, 3.6, 6),
 		ModelName = "EpicWaste",
+	},
+	LegendaryWaste = {
+		Id = "LegendaryWaste",
+		Name = "Legendary Waste",
+		Rarity = "Legendary",
+		RarityWeight = 0.5,
+		MaxHP = 650,
+		WasteReward = 120,
+		WasteRewardPerHP = 0.32,
+		DiamondChance = 0.55,
+		DiamondReward = 8,
+		Color = Color3.fromRGB(239, 177, 64),
+		AccentColor = Color3.fromRGB(255, 236, 132),
+		VisualSize = Vector3.new(7.5, 4.4, 7.5),
+		ModelName = "LegendaryWaste",
 	},
 }
 

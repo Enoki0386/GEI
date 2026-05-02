@@ -229,8 +229,8 @@ Edit `src/ReplicatedStorage/GameData.luau` for most balancing values. The key sy
 
 Rojo is configured to preserve unknown children inside these folders, so you can add Studio-made assets there without the sync deleting them:
 
-- `ReplicatedStorage.ToolModels`: manual Tool assets. Name each asset to match `GameData.Tools.<ToolId>.ModelName`, for example `VacuumWand`. Preferred structure is a real Roblox `Tool` with a `Handle`; a `Model` or `Folder` containing a `Handle` also works and is wrapped into a Tool at runtime.
-- `ReplicatedStorage.WasteModels`: manual Waste models. Name each model to match `GameData.WasteTypes.<WasteId>.ModelName`, for example `CommonWaste`, `RareWaste`, or `EpicWaste`.
+- `ReplicatedStorage.ToolModels`: manual Tool assets. Name each asset to match `GameData.Tools.<ToolId>.ModelName`. Current exact names are `Brush`, `Broom`, `Vacuum`, `Hammer`, and `Crusher`. Preferred structure is a real Roblox `Tool` with a `Handle`; a `Model` or `Folder` containing a `Handle` also works and is wrapped into a Tool at runtime.
+- `ReplicatedStorage.WasteModels`: manual Waste model containers. Current exact names are `CommonWaste`, `RareWaste`, `EpicWaste`, and `LegendaryWaste`. Each one can be a single `Model`/`Part`, or a `Folder` containing several child variants. At spawn time, GEI chooses one random variant from the matching rarity container.
 - `ReplicatedStorage.Sounds`: manual `Sound` objects. Use exact names `WasteHit`, `WasteBreak`, `Sell`, `Buy`, and `Error`.
 
 If a manual model or sound is missing, the game uses the existing fallback visuals and simply skips that sound. Do not use `rbxassetid://0`; empty or zero ids are ignored.
@@ -275,6 +275,8 @@ You can modify:
 - minimum / maximum active Waste Nodes: `GameData.Spawn.MinNodes` and `GameData.Spawn.MaxNodes`
 - spawn speed: `GameData.Spawn.SpawnInterval`
 - Waste HP and rewards: `GameData.WasteTypes`
+- random Waste HP ranges by rarity: `GameData.WasteHPByRarity`
+- manual Waste model height offset: `GameData.WasteVisual.ModelYOffset`
 - rarity chances: `RarityWeight`
 - Diamond chances: `DiamondChance`
 - tool damage / code-only range / cooldown: `GameData.Tools`
@@ -311,6 +313,8 @@ Fast testing is controlled in `src/ReplicatedStorage/GameData.luau`:
 - Brush damage and cooldown: `GameData.Tools.Brush`
 - Player WalkSpeed: `GameData.Player.WalkSpeed`
 - Waste HP/rewards/rarity chances: `GameData.WasteTypes`
+- Random Waste HP ranges: `GameData.WasteHPByRarity`
+- Waste model ground placement: `GameData.WasteVisual.ModelYOffset`
 - Shop prices: `GameData.Tools` and `GameData.Backpacks`
 - Spawn rate: `GameData.Spawn.SpawnInterval`
 - Waste density: `GameData.Spawn.DensityPerStud`
@@ -322,7 +326,7 @@ Fast testing is controlled in `src/ReplicatedStorage/GameData.luau`:
 
 Exact files to edit:
 
-- `src/ReplicatedStorage/GameData.luau`: starting debug values, HP, rewards, tool damage, code-only tool range, shop prices, spawn rate, Waste density/min/max, interaction radius, and circle visuals.
+- `src/ReplicatedStorage/GameData.luau`: starting debug values, random HP ranges, rewards, model names, tool order, tool damage, code-only tool range, shop prices, spawn rate, Waste density/min/max, interaction radius, circle visuals, and Waste visual Y offset.
 - `src/ServerScriptService/Core/PlayerManager.server.luau`: how debug values are applied to player data and how Cash/Diamonds/inventory are stored.
 - `src/ServerScriptService/Systems/WasteNodeManager.server.luau`: how Waste Attributes, HP, rewards, hit feedback, and server attack range are enforced.
 - `src/ServerScriptService/Systems/ShopManager.server.luau`: server validation for purchases and equip requests.
@@ -376,6 +380,14 @@ The Shop and custom toolbar update from this config.
 
 Keep the Tool name matching the id in `GameData.Tools`.
 
+The current tool progression is:
+
+```txt
+Brush -> Broom -> Vacuum -> Hammer -> Crusher
+```
+
+Buying or equipping a new Tool makes it the single active Tool shown in the custom toolbar. Owned Tools stay owned for the Shop, but the player only carries the current Tool.
+
 ## How to add a real Brush swing animation
 
 1. Open Roblox Studio.
@@ -411,7 +423,9 @@ Important: `Infinite Backpack` is not included as a free item. It can be added l
 Important fields:
 
 - `MaxHP`
+- optional random HP range in `GameData.WasteHPByRarity`
 - `WasteReward`
+- `WasteRewardPerHP`
 - `DiamondChance`
 - `DiamondReward`
 - `RarityWeight`
@@ -420,7 +434,28 @@ Important fields:
 
 The spawn system chooses Waste types by rarity weight. Each spawned Waste gets Attributes for `WasteType`, `Rarity`, `MaxHP`, `CurrentHP`, `RewardWaste`, `RewardCash`, `DiamondChance`, and `InteractionRadius`, plus the `WasteNode` CollectionService tag.
 
-To use custom Waste models later, add your models in `ReplicatedStorage.WasteModels`, then set `ModelName` on the matching Waste type in `GameData.WasteTypes`. If `ModelName` is empty or missing, the system uses the current simple fallback shape.
+To use custom Waste models, add them under `ReplicatedStorage.WasteModels` with these exact containers:
+
+```txt
+ReplicatedStorage
+`-- WasteModels
+    |-- CommonWaste
+    |   |-- VariantA
+    |   `-- VariantB
+    |-- RareWaste
+    |-- EpicWaste
+    `-- LegendaryWaste
+```
+
+Each rarity container can be a single `Model`/`Part`, or a `Folder` containing several child `Model`/`Part` variants. The spawn system uses `GameData.WasteTypes.<WasteId>.ModelName` to find the right container, then picks one random variant. If a model is empty, missing, or invalid, the system uses the current simple fallback shape.
+
+If a manual Waste model appears too high or too low, edit:
+
+```lua
+GameData.WasteVisual = {
+	ModelYOffset = 1.55,
+}
+```
 
 ## DataStore In Studio
 
