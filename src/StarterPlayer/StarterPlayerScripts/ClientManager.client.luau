@@ -9,35 +9,41 @@ pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 end)
 
-local gameDataModule = ReplicatedStorage:WaitForChild("GameData", 10)
+local gameDataModule = ReplicatedStorage:WaitForChild("GameData", 20)
 if not gameDataModule then
 	warn("[GEI] GameData is missing. ClientManager stopped.")
 	return
 end
 
 local GameData = require(gameDataModule)
-local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 10)
-	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 10)
+local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 20)
+	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 20)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
-local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ClientManager stopped.")
 	return
 end
 
-local equipItemRemote = remotes:WaitForChild("EquipItem", 10)
-local sellFeedbackRemote = remotes:WaitForChild("SellFeedback", 10)
-local attackFeedbackRemote = remotes:WaitForChild("AttackFeedback", 10)
-local playerDataRemote = remotes:WaitForChild("PlayerDataUpdate", 10)
+local equipItemRemote = remotes:WaitForChild("EquipItem", 20)
+local sellFeedbackRemote = remotes:WaitForChild("SellFeedback", 20)
+local attackFeedbackRemote = remotes:WaitForChild("AttackFeedback", 20)
+local playerDataRemote = remotes:WaitForChild("PlayerDataUpdate", 20)
 
-local playerGui = player:WaitForChild("PlayerGui", 10)
-local playerData = player:WaitForChild("PlayerData", 10)
+local playerGui = player:WaitForChild("PlayerGui", 20)
+local playerData = player:WaitForChild("PlayerData", 25)
 if not playerGui or not playerData then
 	warn("[GEI] PlayerGui or PlayerData missing. ClientManager stopped.")
 	return
 end
 
 local gui = playerGui:FindFirstChild("MainHUD")
+if gui and not gui:IsA("ScreenGui") then
+	warn("[GEI] PlayerGui.MainHUD existed but was not a ScreenGui. Rebuilding HUD.")
+	gui:Destroy()
+	gui = nil
+end
+
 if not gui then
 	gui = Instance.new("ScreenGui")
 	gui.Name = "MainHUD"
@@ -440,7 +446,7 @@ local function bindValueSignals(parent)
 end
 
 bindValueSignals(playerData)
-local leaderstats = player:WaitForChild("leaderstats", 10)
+local leaderstats = player:WaitForChild("leaderstats", 20)
 if leaderstats then
 	bindValueSignals(leaderstats)
 end

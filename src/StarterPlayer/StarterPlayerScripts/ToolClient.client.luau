@@ -113,8 +113,8 @@ local function calculateFallbackInteractionRadius(size)
 	local interactionConfig = GameData.Interaction or {}
 	local halfSurface = math.max(size.X, size.Z) / 2
 	local extraRange = interactionConfig.ExtraRangeFromSurface or 2.5
-	local minRange = interactionConfig.MinRange or 4
-	local maxRange = interactionConfig.MaxRange or 12
+	local minRange = interactionConfig.MinRange or 3.5
+	local maxRange = interactionConfig.MaxRange or 9
 	return math.clamp(halfSurface + extraRange, minRange, maxRange)
 end
 

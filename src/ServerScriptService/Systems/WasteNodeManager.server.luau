@@ -137,17 +137,16 @@ local function calculateInteractionRadius(size)
 	local interactionConfig = GameData.Interaction or {}
 	local halfSurface = math.max(size.X, size.Z) / 2
 	local extraRange = interactionConfig.ExtraRangeFromSurface or 2.5
-	local minRange = interactionConfig.MinRange or 4
-	local maxRange = interactionConfig.MaxRange or 12
+	local minRange = interactionConfig.MinRange or 3.5
+	local maxRange = interactionConfig.MaxRange or 9
 	return math.clamp(halfSurface + extraRange, minRange, maxRange)
 end
 
 local function getRandomHPForWaste(wasteConfig)
-	local hpRanges = GameData.WasteHPByRarity or {}
-	local range = hpRanges[wasteConfig.Rarity]
-	if range and type(range.Min) == "number" and type(range.Max) == "number" then
-		local minHP = math.floor(math.min(range.Min, range.Max))
-		local maxHP = math.floor(math.max(range.Min, range.Max))
+	local hpRange = wasteConfig.HPRange
+	if type(hpRange) == "table" and type(hpRange[1]) == "number" and type(hpRange[2]) == "number" then
+		local minHP = math.floor(math.min(hpRange[1], hpRange[2]))
+		local maxHP = math.floor(math.max(hpRange[1], hpRange[2]))
 		return random:NextInteger(minHP, maxHP)
 	end
 
@@ -174,15 +173,33 @@ local function getZoneId(surface)
 	return "Zone1"
 end
 
-local function getVisualYOffset(zoneId, rarity)
-	local offsets = GameData.WasteVisualOffsets or {}
-	local zoneOffsets = offsets[zoneId] or offsets.Zone1
-	local yOffset = zoneOffsets and zoneOffsets[rarity]
-	if type(yOffset) == "number" then
-		return yOffset
+local function safeVector3(value)
+	if typeof(value) == "Vector3" then
+		return value
 	end
 
-	return 1.55
+	return Vector3.new(0, 0, 0)
+end
+
+local function getWasteModelTuning(zoneId, wasteId, variantName)
+	local config = GameData.WasteModelConfig or {}
+	local zoneConfig = config[zoneId] or config.Zone1 or {}
+	local wasteConfig = zoneConfig[wasteId] or {}
+	local defaultConfig = wasteConfig.Default or {}
+	local variantConfig = wasteConfig[variantName] or {}
+
+	return {
+		VisualOffset = safeVector3(variantConfig.VisualOffset or defaultConfig.VisualOffset),
+		VisualRotation = safeVector3(variantConfig.VisualRotation or defaultConfig.VisualRotation),
+		VisualScale = type(variantConfig.VisualScale) == "number" and variantConfig.VisualScale
+			or type(defaultConfig.VisualScale) == "number" and defaultConfig.VisualScale
+			or 1,
+		RingOffset = safeVector3(variantConfig.RingOffset or defaultConfig.RingOffset),
+		RingRadiusOffset = type(variantConfig.RingRadiusOffset) == "number" and variantConfig.RingRadiusOffset
+			or type(defaultConfig.RingRadiusOffset) == "number" and defaultConfig.RingRadiusOffset
+			or 0,
+		BillboardOffset = safeVector3(variantConfig.BillboardOffset or defaultConfig.BillboardOffset),
+	}
 end
 
 local function getWasteCenter(wasteModel)
@@ -288,14 +305,14 @@ local function findSpawnPosition(surface, wasteZone)
 	return nil
 end
 
-local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, boundsSize)
+local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, modelTuning)
 	local displayConfig = GameData.WasteDisplay
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "WasteBillboard"
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = displayConfig.BillboardMaxDistance
 	billboard.Size = UDim2.fromOffset(displayConfig.BillboardSize.X, displayConfig.BillboardSize.Y)
-	billboard.StudsOffset = Vector3.new(0, boundsCenter.Y + boundsSize.Y / 2 - primaryPart.Position.Y + 2.1, 0)
+	billboard.StudsOffset = boundsCenter + modelTuning.BillboardOffset - primaryPart.Position
 	billboard.Parent = primaryPart
 
 	local frame = Instance.new("Frame")
@@ -389,21 +406,31 @@ local function updateHPBillboard(wasteModel)
 	end
 end
 
-local function createRangeRing(wasteModel, boundsCenter, boundsSize, wasteConfig)
+local function createRangeRing(wasteModel, boundsCenter, boundsSize, wasteConfig, modelTuning)
 	local ringConfig = GameData.InteractionCircle
 	local ringFolder = Instance.new("Folder")
 	ringFolder.Name = "RangeRing"
 	ringFolder.Parent = wasteModel
 
-	local radius = calculateInteractionRadius(boundsSize)
+	local radius = math.clamp(
+		calculateInteractionRadius(boundsSize) + modelTuning.RingRadiusOffset,
+		(GameData.Interaction and GameData.Interaction.MinRange) or 3.5,
+		(GameData.Interaction and GameData.Interaction.MaxRange) or 9
+	)
 	local segmentCount = ringConfig.SegmentCount
 	local segmentLength = ((math.pi * 2 * radius) / segmentCount) * ringConfig.SegmentLengthRatio
-	local center = Vector3.new(boundsCenter.X, boundsCenter.Y - boundsSize.Y / 2 + ringConfig.HeightOffset, boundsCenter.Z)
+	local ringOffset = modelTuning.RingOffset
+	local center = Vector3.new(
+		boundsCenter.X + ringOffset.X,
+		boundsCenter.Y - boundsSize.Y / 2 + ringConfig.HeightOffset + ringOffset.Y,
+		boundsCenter.Z + ringOffset.Z
+	)
 
 	wasteModel:SetAttribute("InteractionRadius", radius)
 	wasteModel:SetAttribute("RingSegmentCount", segmentCount)
-	setVectorAttributes(wasteModel, "InteractionCenter", boundsCenter)
+	setVectorAttributes(wasteModel, "InteractionCenter", center)
 	setVectorAttributes(wasteModel, "InteractionSize", boundsSize)
+	setVectorAttributes(wasteModel, "VisualCenter", boundsCenter)
 
 	for index = 1, segmentCount do
 		local angle = ((index - 1) / segmentCount) * math.pi * 2
@@ -461,21 +488,26 @@ local function getWasteVisualSource(wasteConfig)
 		end
 
 		if #variants == 0 and hasBasePart(root) then
-			return root
+			return root, root.Name, true
 		end
 	elseif root:IsA("Model") then
 		if hasBasePart(root) then
-			return root
+			return root, root.Name, true
 		end
 	elseif root:IsA("BasePart") then
-		return root
+		return root, root.Name, true
 	end
 
 	if #variants == 0 then
+		warnOnce(
+			"WasteModelInvalid_" .. wasteConfig.ModelName,
+			"[WasteNodeManager] ReplicatedStorage.WasteModels." .. wasteConfig.ModelName .. " exists but has no valid Model, Folder, Part, or MeshPart variant with a BasePart."
+		)
 		return nil
 	end
 
-	return variants[random:NextInteger(1, #variants)]
+	local source = variants[random:NextInteger(1, #variants)]
+	return source, source.Name, true
 end
 
 local function setVisualPartProperties(instance)
@@ -494,19 +526,6 @@ local function setVisualPartProperties(instance)
 			descendant.CanTouch = true
 		end
 	end
-end
-
-local function pivotVisualToSpawn(visual, spawnPosition, zoneId, rarity)
-	local yOffset = getVisualYOffset(zoneId, rarity)
-	local targetCFrame = CFrame.new(spawnPosition.X, spawnPosition.Y + yOffset, spawnPosition.Z)
-
-	if visual:IsA("Model") then
-		visual:PivotTo(targetCFrame)
-	elseif visual:IsA("BasePart") then
-		visual.CFrame = targetCFrame
-	end
-
-	return yOffset
 end
 
 local function choosePrimaryPart(visual)
@@ -561,8 +580,32 @@ local function cloneFolderAsModel(source)
 	return visualModel
 end
 
+local function applyVisualScale(visual, scale)
+	if type(scale) ~= "number" or scale <= 0 or math.abs(scale - 1) < 0.001 then
+		return
+	end
+
+	if visual:IsA("Model") then
+		visual:ScaleTo(scale)
+	elseif visual:IsA("BasePart") then
+		visual.Size *= scale
+	end
+end
+
+local function pivotVisualToSpawn(visual, spawnPosition, modelTuning)
+	local rotation = modelTuning.VisualRotation
+	local targetCFrame = CFrame.new(spawnPosition + modelTuning.VisualOffset)
+		* CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+
+	if visual:IsA("Model") then
+		visual:PivotTo(targetCFrame)
+	elseif visual:IsA("BasePart") then
+		visual.CFrame = targetCFrame
+	end
+end
+
 local function createConfiguredVisual(wasteModel, spawnPosition, wasteConfig, zoneId)
-	local source = getWasteVisualSource(wasteConfig)
+	local source, variantName = getWasteVisualSource(wasteConfig)
 	if not source then
 		return nil
 	end
@@ -582,8 +625,10 @@ local function createConfiguredVisual(wasteModel, spawnPosition, wasteConfig, zo
 
 	visual.Parent = wasteModel
 	setVisualPartProperties(visual)
+	local modelTuning = getWasteModelTuning(zoneId, wasteConfig.Id, variantName)
+	applyVisualScale(visual, modelTuning.VisualScale)
+	pivotVisualToSpawn(visual, spawnPosition, modelTuning)
 
-	local yOffset = pivotVisualToSpawn(visual, spawnPosition, zoneId, wasteConfig.Rarity)
 	local primaryPart = choosePrimaryPart(visual)
 	if not primaryPart then
 		visual:Destroy()
@@ -592,10 +637,10 @@ local function createConfiguredVisual(wasteModel, spawnPosition, wasteConfig, zo
 
 	local boundsCFrame, boundsSize = getVisualBounds(visual)
 	print(string.format(
-		"[WasteSpawn] Spawned %s using model %s at Y offset %.3f",
+		"[WasteSpawn] Rarity=%s Variant=%s ModelUsed=true Offset=%s",
 		wasteConfig.Id,
-		source.Name,
-		yOffset
+		variantName,
+		tostring(modelTuning.VisualOffset)
 	))
 
 	return {
@@ -604,11 +649,13 @@ local function createConfiguredVisual(wasteModel, spawnPosition, wasteConfig, zo
 		BoundsCFrame = boundsCFrame,
 		BoundsSize = boundsSize,
 		ModelName = source.Name,
-		YOffset = yOffset,
+		VariantName = variantName,
+		Tuning = modelTuning,
 	}
 end
 
 local function createFallbackVisual(wasteModel, spawnPosition, wasteConfig, zoneId)
+	local modelTuning = getWasteModelTuning(zoneId, wasteConfig.Id, "Default")
 	local visualPart = Instance.new("Part")
 	visualPart.Name = "VisualModel"
 	visualPart.Anchored = true
@@ -621,11 +668,12 @@ local function createFallbackVisual(wasteModel, spawnPosition, wasteConfig, zone
 	visualPart.Size = wasteConfig.VisualSize
 	visualPart.Parent = wasteModel
 
-	local yOffset = pivotVisualToSpawn(visualPart, spawnPosition, zoneId, wasteConfig.Rarity)
+	applyVisualScale(visualPart, modelTuning.VisualScale)
+	pivotVisualToSpawn(visualPart, spawnPosition, modelTuning)
 	print(string.format(
-		"[WasteSpawn] Spawned %s using fallback VisualModel at Y offset %.3f",
+		"[WasteSpawn] Rarity=%s Variant=Fallback ModelUsed=false Offset=%s",
 		wasteConfig.Id,
-		yOffset
+		tostring(modelTuning.VisualOffset)
 	))
 
 	return {
@@ -634,7 +682,8 @@ local function createFallbackVisual(wasteModel, spawnPosition, wasteConfig, zone
 		BoundsCFrame = visualPart.CFrame,
 		BoundsSize = visualPart.Size,
 		ModelName = "fallback VisualModel",
-		YOffset = yOffset,
+		VariantName = "Fallback",
+		Tuning = modelTuning,
 	}
 end
 
@@ -755,10 +804,10 @@ local function createWasteNode(spawnPosition, wasteZone, surface)
 	setVectorAttributes(model, "InteractionCenter", visualInfo.BoundsCFrame.Position)
 	setVectorAttributes(model, "InteractionSize", visualInfo.BoundsSize)
 	model:SetAttribute("VisualModelName", visualInfo.ModelName)
-	model:SetAttribute("VisualYOffset", visualInfo.YOffset)
+	model:SetAttribute("VisualVariant", visualInfo.VariantName)
 
-	createBillboard(visualInfo.PrimaryPart, wasteConfig, maxHP, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize)
-	createRangeRing(model, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize, wasteConfig)
+	createBillboard(visualInfo.PrimaryPart, wasteConfig, maxHP, visualInfo.BoundsCFrame.Position, visualInfo.Tuning)
+	createRangeRing(model, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize, wasteConfig, visualInfo.Tuning)
 	model.Parent = wasteZone
 	CollectionService:AddTag(model, "WasteNode")
 end

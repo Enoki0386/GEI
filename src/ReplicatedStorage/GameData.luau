@@ -36,31 +36,68 @@ GameData.WasteDisplay = {
 	HitTweenTime = 0.08,
 }
 
-GameData.WasteVisualOffsets = {
-	Zone1 = {
-		Common = 2.475,
-		Rare = 2.475,
-		Epic = 2.475,
-		Legendary = 3.3,
-	},
+local DEFAULT_WASTE_MODEL_TUNING = {
+	VisualOffset = Vector3.new(0, 0, 0),
+	VisualRotation = Vector3.new(0, 0, 0),
+	VisualScale = 1,
+	RingOffset = Vector3.new(0, 0, 0),
+	RingRadiusOffset = 0,
+	BillboardOffset = Vector3.new(0, 4, 0),
 }
 
-GameData.WasteHPByRarity = {
-	Common = {
-		Min = 15,
-		Max = 30,
-	},
-	Rare = {
-		Min = 60,
-		Max = 90,
-	},
-	Epic = {
-		Min = 150,
-		Max = 230,
-	},
-	Legendary = {
-		Min = 400,
-		Max = 650,
+GameData.WasteModelConfig = {
+	Zone1 = {
+		CommonWaste = {
+			Default = DEFAULT_WASTE_MODEL_TUNING,
+			TrashPile = {
+				VisualOffset = Vector3.new(0, -0.8, 0),
+				VisualRotation = Vector3.new(0, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 0, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 4, 0),
+			},
+		},
+		RareWaste = {
+			Default = DEFAULT_WASTE_MODEL_TUNING,
+			GarbageBags = {
+				VisualOffset = Vector3.new(0, 0, 0),
+				VisualRotation = Vector3.new(0, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 0, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 4, 0),
+			},
+		},
+		EpicWaste = {
+			Default = DEFAULT_WASTE_MODEL_TUNING,
+			Barrel = {
+				VisualOffset = Vector3.new(0, 0, 0),
+				VisualRotation = Vector3.new(0, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 0, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 4, 0),
+			},
+		},
+		LegendaryWaste = {
+			Default = {
+				VisualOffset = Vector3.new(0, 0, 0),
+				VisualRotation = Vector3.new(0, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 0, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 5, 0),
+			},
+			Boxes = {
+				VisualOffset = Vector3.new(0, 0, 0),
+				VisualRotation = Vector3.new(0, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 0, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 5, 0),
+			},
+		},
 	},
 }
 
@@ -138,26 +175,36 @@ GameData.ToolOrder = {
 	"Crusher",
 }
 
-GameData.ToolVisualOffsets = {
+GameData.ToolModelConfig = {
 	Brush = {
-		Rotation = Vector3.new(0, 0, 0),
-		Position = Vector3.new(0, 0, 0),
+		ModelName = "Brush",
+		GripPosition = Vector3.new(0, 0, 0),
+		GripRotation = Vector3.new(0, 0, 0),
+		VisualScale = 1,
 	},
 	Broom = {
-		Rotation = Vector3.new(0, 0, 0),
-		Position = Vector3.new(0, 0, 0),
+		ModelName = "Broom",
+		GripPosition = Vector3.new(0, 0, 0),
+		GripRotation = Vector3.new(0, 0, 0),
+		VisualScale = 1,
 	},
 	Vacuum = {
-		Rotation = Vector3.new(0, 0, 0),
-		Position = Vector3.new(0, 0, 0),
+		ModelName = "Vacuum",
+		GripPosition = Vector3.new(0, 0, 0),
+		GripRotation = Vector3.new(0, 0, 0),
+		VisualScale = 1,
 	},
 	Hammer = {
-		Rotation = Vector3.new(0, 0, 0),
-		Position = Vector3.new(0, 0, 0),
+		ModelName = "Hammer",
+		GripPosition = Vector3.new(0, 0, 0),
+		GripRotation = Vector3.new(0, 0, 0),
+		VisualScale = 1,
 	},
 	Crusher = {
-		Rotation = Vector3.new(0, 0, 0),
-		Position = Vector3.new(0, 0, 0),
+		ModelName = "Crusher",
+		GripPosition = Vector3.new(0, 0, 0),
+		GripRotation = Vector3.new(0, 0, 0),
+		VisualScale = 1,
 	},
 }
 
@@ -167,7 +214,6 @@ GameData.Tools = {
 		Name = "Brush",
 		Price = 0,
 		Damage = 8,
-		Range = 20,
 		Cooldown = 0.45,
 		Color = Color3.fromRGB(245, 190, 86),
 		Description = "A trusty starter brush for cleaning small piles.",
@@ -184,7 +230,6 @@ GameData.Tools = {
 		Name = "Broom",
 		Price = 150,
 		Damage = 16,
-		Range = 20,
 		Cooldown = 0.43,
 		Color = Color3.fromRGB(98, 184, 126),
 		Description = "A wider sweep for clearing early piles faster.",
@@ -201,7 +246,6 @@ GameData.Tools = {
 		Name = "Vacuum",
 		Price = 650,
 		Damage = 34,
-		Range = 20,
 		Cooldown = 0.4,
 		Color = Color3.fromRGB(95, 211, 210),
 		Description = "A focused vacuum that pulls through tougher trash.",
@@ -218,7 +262,6 @@ GameData.Tools = {
 		Name = "Hammer",
 		Price = 1600,
 		Damage = 70,
-		Range = 20,
 		Cooldown = 0.55,
 		Color = Color3.fromRGB(247, 190, 80),
 		Description = "A heavy hammer for smashing dense waste piles.",
@@ -235,7 +278,6 @@ GameData.Tools = {
 		Name = "Crusher",
 		Price = 4200,
 		Damage = 130,
-		Range = 20,
 		Cooldown = 0.5,
 		Color = Color3.fromRGB(237, 103, 88),
 		Description = "A powerful late-game cleaner for massive piles.",
@@ -298,6 +340,7 @@ GameData.WasteTypes = {
 		Name = "Common Waste",
 		Rarity = "Common",
 		RarityWeight = 72,
+		HPRange = { 15, 30 },
 		MaxHP = 30,
 		WasteReward = 5,
 		WasteRewardPerHP = 0.24,
@@ -313,6 +356,7 @@ GameData.WasteTypes = {
 		Name = "Rare Waste",
 		Rarity = "Rare",
 		RarityWeight = 23,
+		HPRange = { 60, 90 },
 		MaxHP = 90,
 		WasteReward = 18,
 		WasteRewardPerHP = 0.25,
@@ -328,6 +372,7 @@ GameData.WasteTypes = {
 		Name = "Epic Waste",
 		Rarity = "Epic",
 		RarityWeight = 4.5,
+		HPRange = { 150, 230 },
 		MaxHP = 230,
 		WasteReward = 50,
 		WasteRewardPerHP = 0.28,
@@ -343,6 +388,7 @@ GameData.WasteTypes = {
 		Name = "Legendary Waste",
 		Rarity = "Legendary",
 		RarityWeight = 0.5,
+		HPRange = { 400, 650 },
 		MaxHP = 650,
 		WasteReward = 120,
 		WasteRewardPerHP = 0.32,

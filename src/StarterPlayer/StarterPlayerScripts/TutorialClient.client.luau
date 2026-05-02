@@ -18,6 +18,11 @@ if not tutorialRemote or not playerGui or not playerData then
 end
 
 local gui = playerGui:FindFirstChild("MainHUD")
+if gui and not gui:IsA("ScreenGui") then
+	gui:Destroy()
+	gui = nil
+end
+
 if not gui then
 	gui = Instance.new("ScreenGui")
 	gui.Name = "MainHUD"

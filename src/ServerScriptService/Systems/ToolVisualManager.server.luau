@@ -56,40 +56,69 @@ local function findHandle(instance)
 	return nil
 end
 
-local function getToolVisualOffset(toolConfig)
-	local offsets = GameData.ToolVisualOffsets or {}
-	local offset = offsets[toolConfig.Id]
-	if type(offset) ~= "table" then
-		return CFrame.new()
+local function safeVector3(value)
+	if typeof(value) == "Vector3" then
+		return value
 	end
 
-	local position = offset.Position
-	if typeof(position) ~= "Vector3" then
-		position = Vector3.new(0, 0, 0)
-	end
-
-	local rotation = offset.Rotation
-	if typeof(rotation) ~= "Vector3" then
-		rotation = Vector3.new(0, 0, 0)
-	end
-
-	return CFrame.new(position) * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+	return Vector3.new(0, 0, 0)
 end
 
-local function prepareTool(tool, toolConfig)
-	local handle = findHandle(tool)
-	if handle and handle.Parent ~= tool then
-		handle.Parent = tool
+local function getToolModelConfig(toolConfig)
+	local config = GameData.ToolModelConfig and GameData.ToolModelConfig[toolConfig.Id] or {}
+	local modelName = config.ModelName
+	if type(modelName) ~= "string" or modelName == "" then
+		modelName = toolConfig.ModelName
+	end
+	if type(modelName) ~= "string" or modelName == "" then
+		modelName = toolConfig.Id
 	end
 
-	tool.Name = toolConfig.Id
-	tool.ToolTip = toolConfig.Name
-	tool.CanBeDropped = false
-	tool.RequiresHandle = true
-	tool.Grip = ((toolConfig.Visual and toolConfig.Visual.GripOffset) or tool.Grip or DEFAULT_GRIP) * getToolVisualOffset(toolConfig)
-	tool:SetAttribute("ToolId", toolConfig.Id)
-	tool:SetAttribute("GEINativeTool", true)
+	return {
+		ModelName = modelName,
+		GripPosition = safeVector3(config.GripPosition),
+		GripRotation = safeVector3(config.GripRotation),
+		VisualScale = type(config.VisualScale) == "number" and config.VisualScale or 1,
+	}
+end
 
+local function getGripOffset(toolConfig)
+	local modelConfig = getToolModelConfig(toolConfig)
+	local rotation = modelConfig.GripRotation
+	return CFrame.new(modelConfig.GripPosition)
+		* CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+end
+
+local function getBaseParts(instance)
+	local parts = {}
+	if instance:IsA("BasePart") then
+		table.insert(parts, instance)
+	end
+
+	for _, descendant in ipairs(instance:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			table.insert(parts, descendant)
+		end
+	end
+
+	return parts
+end
+
+local function chooseLargestPart(instance)
+	local largestPart = nil
+	local largestVolume = -math.huge
+	for _, part in ipairs(getBaseParts(instance)) do
+		local volume = part.Size.X * part.Size.Y * part.Size.Z
+		if volume > largestVolume then
+			largestVolume = volume
+			largestPart = part
+		end
+	end
+
+	return largestPart
+end
+
+local function setToolPartProperties(tool)
 	for _, descendant in ipairs(tool:GetDescendants()) do
 		if descendant:IsA("BasePart") then
 			descendant.Anchored = false
@@ -99,6 +128,63 @@ local function prepareTool(tool, toolConfig)
 			descendant.Massless = true
 		end
 	end
+end
+
+local function weldToolToHandle(tool, handle)
+	for _, part in ipairs(getBaseParts(tool)) do
+		if part ~= handle then
+			local existing = false
+			for _, child in ipairs(part:GetChildren()) do
+				if child:IsA("WeldConstraint") and ((child.Part0 == handle and child.Part1 == part) or (child.Part1 == handle and child.Part0 == part)) then
+					existing = true
+					break
+				end
+			end
+
+			if not existing then
+				weldTo(handle, part)
+			end
+		end
+	end
+end
+
+local function scaleToolVisual(tool, scale)
+	if type(scale) ~= "number" or scale <= 0 or math.abs(scale - 1) < 0.001 then
+		return
+	end
+
+	for _, part in ipairs(getBaseParts(tool)) do
+		part.Size *= scale
+	end
+end
+
+local function prepareTool(tool, toolConfig)
+	local handle = findHandle(tool)
+	if not handle then
+		handle = chooseLargestPart(tool)
+		if handle then
+			handle.Name = "Handle"
+		end
+	end
+
+	if not handle then
+		warn("[ToolVisualManager] Tool " .. toolConfig.Id .. " has no BasePart that can be used as Handle.")
+		return nil
+	end
+	if handle.Parent ~= tool then
+		handle.Parent = tool
+	end
+
+	tool.Name = toolConfig.Id
+	tool.ToolTip = toolConfig.Name
+	tool.CanBeDropped = false
+	tool.RequiresHandle = true
+	tool.Grip = ((toolConfig.Visual and toolConfig.Visual.GripOffset) or tool.Grip or DEFAULT_GRIP) * getGripOffset(toolConfig)
+	tool:SetAttribute("ToolId", toolConfig.Id)
+	tool:SetAttribute("GEINativeTool", true)
+
+	setToolPartProperties(tool)
+	weldToolToHandle(tool, handle)
 
 	return tool
 end
@@ -142,12 +228,16 @@ local function getToolModelSource(toolConfig)
 		return nil
 	end
 
-	local modelName = toolConfig.ModelName
-	if type(modelName) ~= "string" or modelName == "" then
-		modelName = toolConfig.Id
-	end
+	local modelName = getToolModelConfig(toolConfig).ModelName
 
 	return modelsFolder:FindFirstChild(modelName)
+end
+
+local function moveChildrenIntoTool(sourceClone, tool)
+	for _, child in ipairs(sourceClone:GetChildren()) do
+		child.Parent = tool
+	end
+	sourceClone:Destroy()
 end
 
 local function createToolFromModelSource(toolConfig, source)
@@ -155,48 +245,36 @@ local function createToolFromModelSource(toolConfig, source)
 		return nil
 	end
 
+	local modelConfig = getToolModelConfig(toolConfig)
+	local tool = nil
+
 	if source:IsA("BasePart") then
-		local tool = Instance.new("Tool")
+		tool = Instance.new("Tool")
 		local handle = source:Clone()
 		handle.Name = "Handle"
 		handle.Parent = tool
-		return prepareTool(tool, toolConfig)
-	end
-
-	if source:IsA("Tool") then
-		local tool = source:Clone()
-		local handle = findHandle(tool)
-		if not handle then
-			warn("[ToolVisualManager] ToolModels." .. source.Name .. " is a Tool but has no BasePart named Handle. Using fallback Tool.")
-			tool:Destroy()
-			return nil
-		end
-
-		handle.Parent = tool
-		return prepareTool(tool, toolConfig)
-	end
-
-	if source:IsA("Model") or source:IsA("Folder") then
-		local tool = Instance.new("Tool")
+	elseif source:IsA("Tool") then
+		tool = source:Clone()
+	elseif source:IsA("Model") or source:IsA("Folder") then
+		tool = Instance.new("Tool")
 		local sourceClone = source:Clone()
-		for _, child in ipairs(sourceClone:GetChildren()) do
-			child.Parent = tool
-		end
-		sourceClone:Destroy()
-
-		local handle = findHandle(tool)
-		if not handle then
-			warn("[ToolVisualManager] ToolModels." .. source.Name .. " must contain a Part or MeshPart named Handle. Using fallback Tool.")
-			tool:Destroy()
-			return nil
-		end
-
-		handle.Parent = tool
-		return prepareTool(tool, toolConfig)
+		moveChildrenIntoTool(sourceClone, tool)
+	else
+		warn("[ToolVisualManager] ToolModels." .. source.Name .. " must be a Tool, Model, Folder, Part, or MeshPart. Using fallback Tool.")
+		return nil
 	end
 
-	warn("[ToolVisualManager] ToolModels." .. source.Name .. " must be a Tool, Model, Folder, Part, or MeshPart. Using fallback Tool.")
-	return nil
+	scaleToolVisual(tool, modelConfig.VisualScale)
+	local preparedTool = prepareTool(tool, toolConfig)
+	if not preparedTool then
+		tool:Destroy()
+		warn("[ToolVisualManager] ToolModels." .. source.Name .. " has no usable Part or MeshPart for Handle. Using fallback Tool.")
+		return nil
+	end
+
+	local handle = findHandle(preparedTool)
+	print(string.format("[ToolModel] Loaded model %s with Handle=%s", source.Name, handle and handle.Name or "none"))
+	return preparedTool
 end
 
 local function ensureToolTemplate(toolId)
