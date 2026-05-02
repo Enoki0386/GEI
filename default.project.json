@@ -8,54 +8,31 @@
     },
 
     "ServerScriptService": {
-      "$path": "src/ServerScriptService"
-    },
-
-    "StarterGui": {
-      "MainHUD": {
-        "$className": "ScreenGui",
-        "$path": "src/StarterGui/MainHUD",
-        "$properties": {
-          "DisplayOrder": 10,
-          "IgnoreGuiInset": false,
-          "ResetOnSpawn": false,
-          "ZIndexBehavior": "Sibling"
-        }
+      "$className": "ServerScriptService",
+      "Core": {
+        "$path": "src/ServerScriptService/Core"
+      },
+      "Systems": {
+        "$path": "src/ServerScriptService/Systems"
       }
     },
 
+    "StarterGui": {
+      "$path": "src/StarterGui"
+    },
+
     "StarterPlayer": {
-      "$properties": {
-        "EnableMouseLockOption": true
-      },
+      "$className": "StarterPlayer",
       "StarterPlayerScripts": {
         "$path": "src/StarterPlayer/StarterPlayerScripts"
       }
     },
 
     "Workspace": {
-      "$path": "src/Workspace",
-      "$properties": {
-        "FilteringEnabled": true
-      }
-    },
-
-    "Lighting": {
-      "$properties": {
-        "Ambient": [
-          0.05,
-          0.05,
-          0.05
-        ],
-        "Brightness": 2,
-        "GlobalShadows": true,
-        "Technology": "Voxel"
-      }
-    },
-
-    "SoundService": {
-      "$properties": {
-        "RespectFilteringEnabled": true
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true,
+      "Map": {
+        "$path": "src/Workspace/Map"
       }
     }
   }
