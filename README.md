@@ -231,7 +231,7 @@ Rojo is configured to preserve unknown children inside these folders, so you can
 
 - `ReplicatedStorage.ToolModels`: manual Tool assets. Name each asset to match `GameData.Tools.<ToolId>.ModelName`. Current exact names are `Brush`, `Broom`, `Vacuum`, `Hammer`, and `Crusher`. Preferred structure is a real Roblox `Tool` with a `Handle`; a `Model` or `Folder` containing a `Handle` also works and is wrapped into a Tool at runtime.
 - `ReplicatedStorage.WasteModels`: manual Waste model containers. Current exact names are `CommonWaste`, `RareWaste`, `EpicWaste`, and `LegendaryWaste`. Each one can be a single `Model`/`Part`, or a `Folder` containing several child variants. At spawn time, GEI chooses one random variant from the matching rarity container.
-- `ReplicatedStorage.Sounds`: manual `Sound` objects. Use exact names `WasteHit`, `WasteBreak`, `Sell`, `Buy`, and `Error`.
+- `ReplicatedStorage.Sounds`: manual `Sound` objects. Use exact names `WasteHit`, `WasteBreak`, `Sell`, and `Error`.
 
 If a manual model or sound is missing, the game uses the existing fallback visuals and simply skips that sound. Do not use `rbxassetid://0`; empty or zero ids are ignored.
 
@@ -276,10 +276,10 @@ You can modify:
 - spawn speed: `GameData.Spawn.SpawnInterval`
 - Waste HP and rewards: `GameData.WasteTypes`
 - random Waste HP ranges by rarity: `GameData.WasteHPByRarity`
-- manual Waste model height offset: `GameData.WasteVisual.ModelYOffset`
+- manual Waste model height offsets: `GameData.WasteVisualOffsets`
 - rarity chances: `RarityWeight`
 - Diamond chances: `DiamondChance`
-- tool damage / code-only range / cooldown: `GameData.Tools`
+- tool damage / cooldown: `GameData.Tools`
 - backpack capacity: `GameData.Backpacks`
 - player speed: `GameData.Player.WalkSpeed`
 - recommended manual map positions and sizes: `GameData.World`
@@ -314,7 +314,7 @@ Fast testing is controlled in `src/ReplicatedStorage/GameData.luau`:
 - Player WalkSpeed: `GameData.Player.WalkSpeed`
 - Waste HP/rewards/rarity chances: `GameData.WasteTypes`
 - Random Waste HP ranges: `GameData.WasteHPByRarity`
-- Waste model ground placement: `GameData.WasteVisual.ModelYOffset`
+- Waste model ground placement: `GameData.WasteVisualOffsets`
 - Shop prices: `GameData.Tools` and `GameData.Backpacks`
 - Spawn rate: `GameData.Spawn.SpawnInterval`
 - Waste density: `GameData.Spawn.DensityPerStud`
@@ -326,7 +326,7 @@ Fast testing is controlled in `src/ReplicatedStorage/GameData.luau`:
 
 Exact files to edit:
 
-- `src/ReplicatedStorage/GameData.luau`: starting debug values, random HP ranges, rewards, model names, tool order, tool damage, code-only tool range, shop prices, spawn rate, Waste density/min/max, interaction radius, circle visuals, and Waste visual Y offset.
+- `src/ReplicatedStorage/GameData.luau`: starting debug values, random HP ranges, rewards, model names, tool order, tool damage, shop prices, spawn rate, Waste density/min/max, interaction radius, circle visuals, and Waste visual offsets.
 - `src/ServerScriptService/Core/PlayerManager.server.luau`: how debug values are applied to player data and how Cash/Diamonds/inventory are stored.
 - `src/ServerScriptService/Systems/WasteNodeManager.server.luau`: how Waste Attributes, HP, rewards, hit feedback, and server attack range are enforced.
 - `src/ServerScriptService/Systems/ShopManager.server.luau`: server validation for purchases and equip requests.
@@ -343,7 +343,7 @@ max(WasteSize.X, WasteSize.Z) / 2 + GameData.Interaction.ExtraRangeFromSurface
 
 The result is clamped between `GameData.Interaction.MinRange` and `GameData.Interaction.MaxRange`. If the player is outside the circle, the server rejects the attack.
 
-`PlayerData.ToolRange` is still kept for UI/future balancing, but it does not allow attacks beyond the Waste circle.
+Tool range is not shown in the Shop UI; attacks are limited by the Waste circle.
 
 ## Adding A Tool
 
@@ -358,7 +358,6 @@ SuperBrush = {
 	Name = "Super Brush",
 	Price = 5000,
 	Damage = 100,
-	Range = 26,
 	Cooldown = 0.35,
 	Color = Color3.fromRGB(255, 170, 80),
 	Description = "Late-game cleaner.",
@@ -452,8 +451,11 @@ Each rarity container can be a single `Model`/`Part`, or a `Folder` containing s
 If a manual Waste model appears too high or too low, edit:
 
 ```lua
-GameData.WasteVisual = {
-	ModelYOffset = 1.55,
+GameData.WasteVisualOffsets = {
+	Zone1 = {
+		Common = 2.475,
+		Legendary = 3.3,
+	},
 }
 ```
 

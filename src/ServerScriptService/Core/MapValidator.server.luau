@@ -124,7 +124,7 @@ local function validateMap()
 	if validCount == #REQUIREMENTS then
 		print("[MapValidator] Manual map setup looks ready.")
 	else
-		warn("[MapValidator] Manual map setup is incomplete. See README.md > Manual Roblox Studio Setup.")
+		warnOnce("[MapValidator] Manual map setup is incomplete. See README.md > Manual Roblox Studio Setup.")
 	end
 end
 

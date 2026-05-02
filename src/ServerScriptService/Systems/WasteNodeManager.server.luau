@@ -146,6 +146,28 @@ local function getRewardWasteForHP(wasteConfig, maxHP)
 	return math.max(1, math.floor(wasteConfig.WasteReward or 1))
 end
 
+local function getZoneId(surface)
+	if surface then
+		local zoneId = surface:GetAttribute("ZoneId")
+		if type(zoneId) == "string" and zoneId ~= "" then
+			return zoneId
+		end
+	end
+
+	return "Zone1"
+end
+
+local function getVisualYOffset(zoneId, rarity)
+	local offsets = GameData.WasteVisualOffsets or {}
+	local zoneOffsets = offsets[zoneId] or offsets.Zone1
+	local yOffset = zoneOffsets and zoneOffsets[rarity]
+	if type(yOffset) == "number" then
+		return yOffset
+	end
+
+	return 1.55
+end
+
 local function hasEquippedNativeTool(player, toolId)
 	local character = player.Character
 	if not character then
@@ -376,6 +398,10 @@ local function getWasteVisualSource(wasteConfig)
 				table.insert(variants, child)
 			end
 		end
+
+		if #variants == 0 then
+			return root
+		end
 	elseif root:IsA("Model") then
 		for _, child in ipairs(root:GetChildren()) do
 			if child:IsA("Model") or child:IsA("Folder") then
@@ -415,9 +441,8 @@ local function setVisualPartProperties(instance)
 	end
 end
 
-local function pivotVisualToGround(visual, hitbox)
-	local visualConfig = GameData.WasteVisual or {}
-	local yOffset = visualConfig.ModelYOffset or 1.55
+local function pivotVisualToGround(visual, hitbox, zoneId, rarity)
+	local yOffset = getVisualYOffset(zoneId, rarity)
 	local groundY = hitbox.Position.Y - hitbox.Size.Y / 2
 	local targetCFrame = CFrame.new(hitbox.Position.X, groundY + yOffset, hitbox.Position.Z)
 
@@ -428,7 +453,7 @@ local function pivotVisualToGround(visual, hitbox)
 	end
 end
 
-local function createConfiguredVisual(wasteModel, hitbox, wasteConfig)
+local function createConfiguredVisual(wasteModel, hitbox, wasteConfig, zoneId)
 	local source = getWasteVisualSource(wasteConfig)
 	if not source then
 		return false
@@ -439,13 +464,13 @@ local function createConfiguredVisual(wasteModel, hitbox, wasteConfig)
 		visualPart.Name = "VisualModel"
 		visualPart.Parent = wasteModel
 		setVisualPartProperties(visualPart)
-		pivotVisualToGround(visualPart, hitbox)
+		pivotVisualToGround(visualPart, hitbox, zoneId, wasteConfig.Rarity)
 	elseif source:IsA("Model") then
 		local visualModel = source:Clone()
 		visualModel.Name = "VisualModel"
 		visualModel.Parent = wasteModel
 		setVisualPartProperties(visualModel)
-		pivotVisualToGround(visualModel, hitbox)
+		pivotVisualToGround(visualModel, hitbox, zoneId, wasteConfig.Rarity)
 	elseif source:IsA("Folder") then
 		local visualModel = Instance.new("Model")
 		visualModel.Name = "VisualModel"
@@ -458,7 +483,7 @@ local function createConfiguredVisual(wasteModel, hitbox, wasteConfig)
 
 		visualModel.Parent = wasteModel
 		setVisualPartProperties(visualModel)
-		pivotVisualToGround(visualModel, hitbox)
+		pivotVisualToGround(visualModel, hitbox, zoneId, wasteConfig.Rarity)
 	else
 		return false
 	end
@@ -567,16 +592,18 @@ local function playDestroyFeedback(wasteModel)
 	Debris:AddItem(effectPart, 0.8)
 end
 
-local function createWasteNode(spawnPosition, wasteZone)
+local function createWasteNode(spawnPosition, wasteZone, surface)
 	local wasteId, wasteConfig = GameData.GetRandomWasteType(random)
 	local size = wasteConfig.VisualSize
 	local hitboxPosition = spawnPosition + Vector3.new(0, size.Y / 2, 0)
 	local maxHP = getRandomHPForWaste(wasteConfig)
 	local rewardWaste = getRewardWasteForHP(wasteConfig, maxHP)
+	local zoneId = getZoneId(surface)
 
 	local model = Instance.new("Model")
 	model.Name = wasteConfig.Name
 	model:SetAttribute("GEIWasteNode", true)
+	model:SetAttribute("ZoneId", zoneId)
 	model:SetAttribute("WasteId", wasteId)
 	model:SetAttribute("WasteType", wasteId)
 	model:SetAttribute("ModelName", wasteConfig.ModelName or "")
@@ -592,7 +619,7 @@ local function createWasteNode(spawnPosition, wasteZone)
 	local hitbox = Instance.new("Part")
 	hitbox.Name = "Hitbox"
 	hitbox.Anchored = true
-	hitbox.CanCollide = false
+	hitbox.CanCollide = true
 	hitbox.CanTouch = false
 	hitbox.Color = wasteConfig.Color
 	hitbox.Material = Enum.Material.SmoothPlastic
@@ -602,7 +629,7 @@ local function createWasteNode(spawnPosition, wasteZone)
 	hitbox.Parent = model
 
 	model.PrimaryPart = hitbox
-	if not createConfiguredVisual(model, hitbox, wasteConfig) then
+	if not createConfiguredVisual(model, hitbox, wasteConfig, zoneId) then
 		createFallbackVisual(model, hitbox, wasteConfig)
 	end
 	createBillboard(hitbox, wasteConfig, maxHP)
@@ -754,7 +781,7 @@ task.spawn(function()
 					break
 				end
 
-				createWasteNode(spawnPosition, wasteZone)
+				createWasteNode(spawnPosition, wasteZone, surface)
 				activeWaste += 1
 			end
 		end

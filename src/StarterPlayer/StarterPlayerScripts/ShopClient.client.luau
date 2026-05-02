@@ -664,10 +664,6 @@ if purchaseResultRemote then
 		local itemName = config and config.Name or tostring(itemId)
 
 		if ok then
-			if SoundUtil and reason == "Bought" then
-				SoundUtil.Play("Buy", GameData, playerGui)
-			end
-
 			if reason == "Bought" then
 				showNotification("Bought " .. itemName, Color3.fromRGB(136, 255, 164))
 			elseif reason == "Equipped" then

@@ -115,6 +115,10 @@ local function getToolDamage(tool)
 	return math.max(0, math.floor((tool.Damage or 0) * multiplier))
 end
 
+local function getToolRange(tool)
+	return math.max(0, math.floor(tool.Range or 20))
+end
+
 local function createDefaultSaveData()
 	return applyDebugOverrides({
 		Cash = GameData.Economy.StartingCash,
@@ -264,7 +268,7 @@ local function updateDerivedStats(player)
 	local backpack = equippedBackpack and GameData.GetBackpack(equippedBackpack.Value) or GameData.GetBackpack("SmallBag")
 
 	createValue("NumberValue", "ToolDamage", getToolDamage(tool), dataFolder)
-	createValue("NumberValue", "ToolRange", tool.Range, dataFolder)
+	createValue("NumberValue", "ToolRange", getToolRange(tool), dataFolder)
 	createValue("IntValue", "MaxWaste", backpack.Capacity, dataFolder)
 
 	local wasteCount = dataFolder:FindFirstChild("WasteCount")
@@ -389,7 +393,7 @@ local function setupPlayer(player)
 	createValue("BoolValue", "IsToolEquipped", false, dataFolder)
 	createValue("StringValue", "EquippedBackpack", backpack.Id, dataFolder)
 	createValue("NumberValue", "ToolDamage", getToolDamage(tool), dataFolder)
-	createValue("NumberValue", "ToolRange", tool.Range, dataFolder)
+	createValue("NumberValue", "ToolRange", getToolRange(tool), dataFolder)
 
 	createOwnedFolder("OwnedTools", saveData.OwnedTools, dataFolder)
 	createOwnedFolder("OwnedBackpacks", saveData.OwnedBackpacks, dataFolder)

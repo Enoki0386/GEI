@@ -36,8 +36,13 @@ GameData.WasteDisplay = {
 	HitTweenTime = 0.08,
 }
 
-GameData.WasteVisual = {
-	ModelYOffset = 1.55,
+GameData.WasteVisualOffsets = {
+	Zone1 = {
+		Common = 2.475,
+		Rare = 2.475,
+		Epic = 2.475,
+		Legendary = 3.3,
+	},
 }
 
 GameData.WasteHPByRarity = {
@@ -87,7 +92,6 @@ GameData.Sounds = {
 	WasteHit = "",
 	WasteBreak = "",
 	Sell = "",
-	Buy = "",
 	Error = "",
 	Footstep = "",
 	Jump = "",
@@ -134,13 +138,36 @@ GameData.ToolOrder = {
 	"Crusher",
 }
 
+GameData.ToolVisualOffsets = {
+	Brush = {
+		Rotation = Vector3.new(0, 0, 0),
+		Position = Vector3.new(0, 0, 0),
+	},
+	Broom = {
+		Rotation = Vector3.new(0, 0, 0),
+		Position = Vector3.new(0, 0, 0),
+	},
+	Vacuum = {
+		Rotation = Vector3.new(0, 0, 0),
+		Position = Vector3.new(0, 0, 0),
+	},
+	Hammer = {
+		Rotation = Vector3.new(0, 0, 0),
+		Position = Vector3.new(0, 0, 0),
+	},
+	Crusher = {
+		Rotation = Vector3.new(0, 0, 0),
+		Position = Vector3.new(0, 0, 0),
+	},
+}
+
 GameData.Tools = {
 	Brush = {
 		Id = "Brush",
 		Name = "Brush",
 		Price = 0,
 		Damage = 8,
-		Range = 18,
+		Range = 20,
 		Cooldown = 0.45,
 		Color = Color3.fromRGB(245, 190, 86),
 		Description = "A trusty starter brush for cleaning small piles.",
@@ -157,7 +184,7 @@ GameData.Tools = {
 		Name = "Broom",
 		Price = 150,
 		Damage = 16,
-		Range = 19,
+		Range = 20,
 		Cooldown = 0.43,
 		Color = Color3.fromRGB(98, 184, 126),
 		Description = "A wider sweep for clearing early piles faster.",
@@ -174,7 +201,7 @@ GameData.Tools = {
 		Name = "Vacuum",
 		Price = 650,
 		Damage = 34,
-		Range = 21,
+		Range = 20,
 		Cooldown = 0.4,
 		Color = Color3.fromRGB(95, 211, 210),
 		Description = "A focused vacuum that pulls through tougher trash.",
@@ -208,7 +235,7 @@ GameData.Tools = {
 		Name = "Crusher",
 		Price = 4200,
 		Damage = 130,
-		Range = 22,
+		Range = 20,
 		Cooldown = 0.5,
 		Color = Color3.fromRGB(237, 103, 88),
 		Description = "A powerful late-game cleaner for massive piles.",

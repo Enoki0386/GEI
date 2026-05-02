@@ -47,12 +47,46 @@ local function weldTo(part0, part1)
 	return weld
 end
 
+local function findHandle(instance)
+	local handle = instance:FindFirstChild("Handle", true)
+	if handle and handle:IsA("BasePart") then
+		return handle
+	end
+
+	return nil
+end
+
+local function getToolVisualOffset(toolConfig)
+	local offsets = GameData.ToolVisualOffsets or {}
+	local offset = offsets[toolConfig.Id]
+	if type(offset) ~= "table" then
+		return CFrame.new()
+	end
+
+	local position = offset.Position
+	if typeof(position) ~= "Vector3" then
+		position = Vector3.new(0, 0, 0)
+	end
+
+	local rotation = offset.Rotation
+	if typeof(rotation) ~= "Vector3" then
+		rotation = Vector3.new(0, 0, 0)
+	end
+
+	return CFrame.new(position) * CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+end
+
 local function prepareTool(tool, toolConfig)
+	local handle = findHandle(tool)
+	if handle and handle.Parent ~= tool then
+		handle.Parent = tool
+	end
+
 	tool.Name = toolConfig.Id
 	tool.ToolTip = toolConfig.Name
 	tool.CanBeDropped = false
 	tool.RequiresHandle = true
-	tool.Grip = (toolConfig.Visual and toolConfig.Visual.GripOffset) or tool.Grip or DEFAULT_GRIP
+	tool.Grip = ((toolConfig.Visual and toolConfig.Visual.GripOffset) or tool.Grip or DEFAULT_GRIP) * getToolVisualOffset(toolConfig)
 	tool:SetAttribute("ToolId", toolConfig.Id)
 	tool:SetAttribute("GEINativeTool", true)
 
@@ -121,14 +155,24 @@ local function createToolFromModelSource(toolConfig, source)
 		return nil
 	end
 
+	if source:IsA("BasePart") then
+		local tool = Instance.new("Tool")
+		local handle = source:Clone()
+		handle.Name = "Handle"
+		handle.Parent = tool
+		return prepareTool(tool, toolConfig)
+	end
+
 	if source:IsA("Tool") then
 		local tool = source:Clone()
-		if not tool:FindFirstChild("Handle") then
-			warn("[ToolVisualManager] ToolModels." .. source.Name .. " is a Tool but has no Handle. Using fallback Tool.")
+		local handle = findHandle(tool)
+		if not handle then
+			warn("[ToolVisualManager] ToolModels." .. source.Name .. " is a Tool but has no BasePart named Handle. Using fallback Tool.")
 			tool:Destroy()
 			return nil
 		end
 
+		handle.Parent = tool
 		return prepareTool(tool, toolConfig)
 	end
 
@@ -140,16 +184,18 @@ local function createToolFromModelSource(toolConfig, source)
 		end
 		sourceClone:Destroy()
 
-		if not tool:FindFirstChild("Handle") then
-			warn("[ToolVisualManager] ToolModels." .. source.Name .. " must contain a Part named Handle. Using fallback Tool.")
+		local handle = findHandle(tool)
+		if not handle then
+			warn("[ToolVisualManager] ToolModels." .. source.Name .. " must contain a Part or MeshPart named Handle. Using fallback Tool.")
 			tool:Destroy()
 			return nil
 		end
 
+		handle.Parent = tool
 		return prepareTool(tool, toolConfig)
 	end
 
-	warn("[ToolVisualManager] ToolModels." .. source.Name .. " must be a Tool, Model, or Folder. Using fallback Tool.")
+	warn("[ToolVisualManager] ToolModels." .. source.Name .. " must be a Tool, Model, Folder, Part, or MeshPart. Using fallback Tool.")
 	return nil
 end
 
@@ -160,8 +206,19 @@ local function ensureToolTemplate(toolId)
 	end
 
 	local toolsFolder = getToolsFolder()
+	local modelSource = getToolModelSource(toolConfig)
 	local existing = toolsFolder:FindFirstChild(toolId)
-	if existing and existing:IsA("Tool") and existing:FindFirstChild("Handle") then
+	if modelSource then
+		if existing then
+			existing:Destroy()
+		end
+
+		local tool = createToolFromModelSource(toolConfig, modelSource) or createFallbackTool(toolConfig)
+		tool.Parent = toolsFolder
+		return tool
+	end
+
+	if existing and existing:IsA("Tool") and findHandle(existing) then
 		return prepareTool(existing, toolConfig)
 	end
 
@@ -170,7 +227,7 @@ local function ensureToolTemplate(toolId)
 		existing:Destroy()
 	end
 
-	local tool = createToolFromModelSource(toolConfig, getToolModelSource(toolConfig)) or createFallbackTool(toolConfig)
+	local tool = createFallbackTool(toolConfig)
 	tool.Parent = toolsFolder
 	return tool
 end
