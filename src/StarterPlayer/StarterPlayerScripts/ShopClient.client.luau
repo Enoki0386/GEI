@@ -49,118 +49,6 @@ local function formatNumber(value)
 	return tostring(value)
 end
 
-local gui = playerGui:FindFirstChild("GEIShop")
-if gui then
-	gui:Destroy()
-end
-
-gui = new("ScreenGui", {
-	Name = "GEIShop",
-	DisplayOrder = 30,
-	IgnoreGuiInset = false,
-	ResetOnSpawn = false,
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-}, playerGui)
-
-local overlay = new("Frame", {
-	Name = "Overlay",
-	BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-	BackgroundTransparency = 0.58,
-	BorderSizePixel = 0,
-	Size = UDim2.fromScale(1, 1),
-	Visible = false,
-}, gui)
-
-local panel = new("Frame", {
-	Name = "Panel",
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = Color3.fromRGB(238, 242, 240),
-	BorderSizePixel = 0,
-	Position = UDim2.fromScale(0.5, 0.52),
-	Size = UDim2.fromScale(0.72, 0.68),
-}, overlay)
-new("UICorner", { CornerRadius = UDim.new(0, 22) }, panel)
-new("UIStroke", {
-	Color = Color3.fromRGB(255, 255, 255),
-	Thickness = 2,
-	Transparency = 0.12,
-}, panel)
-new("UISizeConstraint", {
-	MaxSize = Vector2.new(860, 560),
-	MinSize = Vector2.new(520, 360),
-}, panel)
-
-local panelScale = new("UIScale", {
-	Scale = 0.92,
-}, panel)
-
-local title = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBlack,
-	Position = UDim2.fromOffset(24, 18),
-	Size = UDim2.new(1, -88, 0, 34),
-	Text = "Shop",
-	TextColor3 = Color3.fromRGB(24, 29, 31),
-	TextScaled = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-}, panel)
-new("UITextSizeConstraint", {
-	MaxTextSize = 30,
-	MinTextSize = 16,
-}, title)
-
-local closeButton = new("TextButton", {
-	AnchorPoint = Vector2.new(1, 0),
-	AutoButtonColor = true,
-	BackgroundColor3 = Color3.fromRGB(221, 227, 226),
-	BorderSizePixel = 0,
-	Font = Enum.Font.GothamBold,
-	Position = UDim2.new(1, -18, 0, 18),
-	Size = UDim2.fromOffset(38, 38),
-	Text = "X",
-	TextColor3 = Color3.fromRGB(37, 43, 45),
-	TextScaled = true,
-}, panel)
-new("UICorner", { CornerRadius = UDim.new(0, 12) }, closeButton)
-new("UITextSizeConstraint", {
-	MaxTextSize = 20,
-	MinTextSize = 10,
-}, closeButton)
-
-local tabs = new("Frame", {
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(24, 68),
-	Size = UDim2.new(1, -48, 0, 44),
-}, panel)
-new("UIListLayout", {
-	FillDirection = Enum.FillDirection.Horizontal,
-	Padding = UDim.new(0, 10),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, tabs)
-
-local gridHolder = new("ScrollingFrame", {
-	Name = "Grid",
-	Active = true,
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	BackgroundTransparency = 1,
-	BorderSizePixel = 0,
-	CanvasSize = UDim2.fromOffset(0, 0),
-	Position = UDim2.fromOffset(24, 126),
-	ScrollBarImageColor3 = Color3.fromRGB(93, 103, 108),
-	ScrollBarThickness = 5,
-	Size = UDim2.new(1, -48, 1, -150),
-}, panel)
-
-local gridLayout = new("UIGridLayout", {
-	CellPadding = UDim2.fromOffset(12, 12),
-	CellSize = UDim2.fromOffset(166, 184),
-	FillDirectionMaxCells = 4,
-	SortOrder = Enum.SortOrder.LayoutOrder,
-}, gridHolder)
-
-local activeTab = "Tools"
-local tabButtons = {}
-
 local function getLeaderCash()
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local cash = leaderstats and leaderstats:FindFirstChild("Cash")
@@ -180,6 +68,349 @@ local function isEquipped(category, itemId)
 	return equipped ~= nil and equipped.Value == itemId
 end
 
+local function getStatus(category, itemId, config)
+	local owned = ownsItem(category, itemId)
+	local equipped = isEquipped(category, itemId)
+	if equipped then
+		return "Equipped", Color3.fromRGB(77, 172, 104)
+	elseif owned then
+		return "Equip", Color3.fromRGB(75, 121, 219)
+	elseif getLeaderCash() >= config.Price then
+		return "Buy", Color3.fromRGB(58, 174, 97)
+	end
+
+	return "Buy", Color3.fromRGB(119, 127, 132)
+end
+
+local function getConfig(category, itemId)
+	if category == "Tool" then
+		return GameData.Tools[itemId]
+	elseif category == "Backpack" then
+		return GameData.Backpacks[itemId]
+	end
+
+	return nil
+end
+
+local gui = playerGui:FindFirstChild("GEIShop")
+if gui then
+	gui:Destroy()
+end
+
+gui = new("ScreenGui", {
+	Name = "GEIShop",
+	DisplayOrder = 30,
+	IgnoreGuiInset = false,
+	ResetOnSpawn = false,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, playerGui)
+
+local overlay = new("Frame", {
+	Name = "Overlay",
+	BackgroundColor3 = Color3.fromRGB(7, 10, 13),
+	BackgroundTransparency = 0.45,
+	BorderSizePixel = 0,
+	Size = UDim2.fromScale(1, 1),
+	Visible = false,
+}, gui)
+
+local panel = new("Frame", {
+	Name = "Panel",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = Color3.fromRGB(234, 240, 238),
+	BorderSizePixel = 0,
+	Position = UDim2.fromScale(0.5, 0.52),
+	Size = UDim2.fromScale(0.78, 0.7),
+}, overlay)
+new("UICorner", { CornerRadius = UDim.new(0, 22) }, panel)
+new("UIStroke", {
+	Color = Color3.fromRGB(255, 255, 255),
+	Thickness = 2,
+	Transparency = 0.1,
+}, panel)
+new("UISizeConstraint", {
+	MaxSize = Vector2.new(980, 600),
+	MinSize = Vector2.new(640, 420),
+}, panel)
+
+local panelScale = new("UIScale", {
+	Scale = 0.92,
+}, panel)
+
+local title = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.fromOffset(24, 18),
+	Size = UDim2.new(1, -88, 0, 34),
+	Text = "Shop",
+	TextColor3 = Color3.fromRGB(23, 28, 31),
+	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, panel)
+new("UITextSizeConstraint", {
+	MaxTextSize = 30,
+	MinTextSize = 16,
+}, title)
+
+local closeButton = new("TextButton", {
+	AnchorPoint = Vector2.new(1, 0),
+	AutoButtonColor = true,
+	BackgroundColor3 = Color3.fromRGB(218, 226, 225),
+	BorderSizePixel = 0,
+	Font = Enum.Font.GothamBold,
+	Position = UDim2.new(1, -18, 0, 18),
+	Size = UDim2.fromOffset(38, 38),
+	Text = "X",
+	TextColor3 = Color3.fromRGB(35, 41, 43),
+	TextScaled = true,
+}, panel)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, closeButton)
+new("UITextSizeConstraint", {
+	MaxTextSize = 20,
+	MinTextSize = 10,
+}, closeButton)
+
+local notification = new("TextLabel", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = Color3.fromRGB(24, 30, 33),
+	BackgroundTransparency = 0.05,
+	BorderSizePixel = 0,
+	Font = Enum.Font.GothamBold,
+	Position = UDim2.new(0.5, 0, 0, 18),
+	Size = UDim2.fromOffset(360, 34),
+	Text = "",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+	Visible = false,
+	ZIndex = 5,
+}, overlay)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, notification)
+new("UITextSizeConstraint", {
+	MaxTextSize = 16,
+	MinTextSize = 9,
+}, notification)
+
+local tabs = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(24, 68),
+	Size = UDim2.new(1, -48, 0, 42),
+}, panel)
+new("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	Padding = UDim.new(0, 10),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, tabs)
+
+local gridHolder = new("ScrollingFrame", {
+	Name = "Grid",
+	Active = true,
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	CanvasSize = UDim2.fromOffset(0, 0),
+	Position = UDim2.fromOffset(24, 126),
+	ScrollBarImageColor3 = Color3.fromRGB(93, 103, 108),
+	ScrollBarThickness = 5,
+	Size = UDim2.new(1, -338, 1, -150),
+}, panel)
+
+local gridLayout = new("UIGridLayout", {
+	CellPadding = UDim2.fromOffset(12, 12),
+	CellSize = UDim2.fromOffset(158, 160),
+	FillDirectionMaxCells = 3,
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, gridHolder)
+
+local detailsPanel = new("Frame", {
+	Name = "DetailsPanel",
+	AnchorPoint = Vector2.new(1, 0),
+	BackgroundColor3 = Color3.fromRGB(23, 29, 33),
+	BackgroundTransparency = 0.05,
+	BorderSizePixel = 0,
+	Position = UDim2.new(1, -24, 0, 126),
+	Size = UDim2.new(0, 276, 1, -150),
+}, panel)
+new("UICorner", { CornerRadius = UDim.new(0, 18) }, detailsPanel)
+new("UIStroke", {
+	Color = Color3.fromRGB(255, 255, 255),
+	Thickness = 1,
+	Transparency = 0.78,
+}, detailsPanel)
+
+local detailSwatch = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(18, 18),
+	Size = UDim2.fromOffset(46, 46),
+}, detailsPanel)
+new("UICorner", { CornerRadius = UDim.new(0, 13) }, detailSwatch)
+
+local detailTitle = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.fromOffset(76, 16),
+	Size = UDim2.new(1, -94, 0, 48),
+	Text = "Select an item",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, detailsPanel)
+new("UITextSizeConstraint", {
+	MaxTextSize = 22,
+	MinTextSize = 11,
+}, detailTitle)
+
+local detailDescription = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamMedium,
+	Position = UDim2.fromOffset(18, 78),
+	Size = UDim2.new(1, -36, 0, 54),
+	Text = "Choose an item from the grid.",
+	TextColor3 = Color3.fromRGB(207, 218, 222),
+	TextScaled = true,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+}, detailsPanel)
+new("UITextSizeConstraint", {
+	MaxTextSize = 15,
+	MinTextSize = 9,
+}, detailDescription)
+
+local detailStats = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(18, 150),
+	Size = UDim2.new(1, -36, 1, -230),
+}, detailsPanel)
+local detailStatsLayout = new("UIListLayout", {
+	Padding = UDim.new(0, 8),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, detailStats)
+
+local detailAction = new("TextButton", {
+	AnchorPoint = Vector2.new(0.5, 1),
+	AutoButtonColor = true,
+	BackgroundColor3 = Color3.fromRGB(58, 174, 97),
+	BorderSizePixel = 0,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.new(0.5, 0, 1, -18),
+	Size = UDim2.new(1, -36, 0, 42),
+	Text = "Buy",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+}, detailsPanel)
+new("UICorner", { CornerRadius = UDim.new(0, 14) }, detailAction)
+new("UITextSizeConstraint", {
+	MaxTextSize = 18,
+	MinTextSize = 10,
+}, detailAction)
+
+local activeTab = "Tools"
+local selectedCategory = "Tool"
+local selectedItemId = "Brush"
+local tabButtons = {}
+local notificationTween = nil
+
+local function showNotification(text, color)
+	if notificationTween then
+		notificationTween:Cancel()
+	end
+
+	notification.Text = text
+	notification.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+	notification.Visible = true
+	notification.TextTransparency = 0
+	notification.BackgroundTransparency = 0.05
+
+	local tween = TweenService:Create(notification, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 1.35), {
+		TextTransparency = 1,
+		BackgroundTransparency = 1,
+	})
+	notificationTween = tween
+	tween:Play()
+	tween.Completed:Connect(function()
+		if notificationTween == tween then
+			notification.Visible = false
+			notificationTween = nil
+		end
+	end)
+end
+
+local function clearDetailsStats()
+	for _, child in ipairs(detailStats:GetChildren()) do
+		if child ~= detailStatsLayout then
+			child:Destroy()
+		end
+	end
+end
+
+local function addDetailRow(labelText, valueText, layoutOrder)
+	local row = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(35, 43, 47),
+		BackgroundTransparency = 0.05,
+		BorderSizePixel = 0,
+		LayoutOrder = layoutOrder,
+		Size = UDim2.new(1, 0, 0, 34),
+	}, detailStats)
+	new("UICorner", { CornerRadius = UDim.new(0, 10) }, row)
+
+	local label = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		Position = UDim2.fromOffset(10, 4),
+		Size = UDim2.new(0.48, -12, 1, -8),
+		Text = labelText,
+		TextColor3 = Color3.fromRGB(160, 176, 182),
+		TextScaled = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	}, row)
+	new("UITextSizeConstraint", {
+		MaxTextSize = 13,
+		MinTextSize = 8,
+	}, label)
+
+	local value = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		Position = UDim2.new(0.48, 0, 0, 4),
+		Size = UDim2.new(0.52, -10, 1, -8),
+		Text = valueText,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextScaled = true,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	}, row)
+	new("UITextSizeConstraint", {
+		MaxTextSize = 14,
+		MinTextSize = 8,
+	}, value)
+end
+
+local function refreshDetails()
+	local config = getConfig(selectedCategory, selectedItemId)
+	if not config then
+		return
+	end
+
+	detailSwatch.BackgroundColor3 = config.Color
+	detailTitle.Text = config.Name
+	detailDescription.Text = config.Description or "No description yet."
+	clearDetailsStats()
+
+	if selectedCategory == "Tool" then
+		addDetailRow("Damage", tostring(config.Damage), 1)
+		addDetailRow("Range", tostring(config.Range), 2)
+		addDetailRow("Cooldown", string.format("%.2fs", config.Cooldown or 0), 3)
+	else
+		addDetailRow("Capacity", formatNumber(config.Capacity), 1)
+	end
+	addDetailRow("Price", config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash", 10)
+
+	local buttonText, buttonColor = getStatus(selectedCategory, selectedItemId, config)
+	detailAction.Text = buttonText
+	detailAction.BackgroundColor3 = buttonColor
+	detailAction.AutoButtonColor = buttonText ~= "Equipped"
+end
+
 local function clearGrid()
 	for _, child in ipairs(gridHolder:GetChildren()) do
 		if child ~= gridLayout then
@@ -188,125 +419,140 @@ local function clearGrid()
 	end
 end
 
+local function selectItem(category, itemId)
+	selectedCategory = category
+	selectedItemId = itemId
+	refreshDetails()
+end
+
+local function triggerSelectedAction()
+	local config = getConfig(selectedCategory, selectedItemId)
+	if not config then
+		return
+	end
+
+	if isEquipped(selectedCategory, selectedItemId) then
+		return
+	end
+
+	if ownsItem(selectedCategory, selectedItemId) then
+		equipItemRemote:FireServer(selectedCategory, selectedItemId)
+	else
+		buyItemRemote:FireServer(selectedCategory, selectedItemId)
+	end
+end
+
 local function createItemCard(category, itemId, config, layoutOrder)
+	local selected = selectedCategory == category and selectedItemId == itemId
 	local owned = ownsItem(category, itemId)
 	local equipped = isEquipped(category, itemId)
-	local canAfford = getLeaderCash() >= config.Price
+	local buttonText, buttonColor = getStatus(category, itemId, config)
 
-	local card = new("Frame", {
-		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	local card = new("TextButton", {
+		AutoButtonColor = true,
+		BackgroundColor3 = selected and Color3.fromRGB(252, 255, 246) or Color3.fromRGB(255, 255, 255),
 		BorderSizePixel = 0,
 		LayoutOrder = layoutOrder,
+		Text = "",
 	}, gridHolder)
 	new("UICorner", { CornerRadius = UDim.new(0, 16) }, card)
 	new("UIStroke", {
-		Color = equipped and Color3.fromRGB(70, 196, 112) or Color3.fromRGB(214, 221, 222),
-		Thickness = equipped and 2.2 or 1,
-		Transparency = equipped and 0.02 or 0.1,
+		Color = selected and config.Color or (equipped and Color3.fromRGB(70, 196, 112) or Color3.fromRGB(214, 221, 222)),
+		Thickness = selected and 2.6 or (equipped and 2 or 1),
+		Transparency = selected and 0 or 0.12,
 	}, card)
 
 	local swatch = new("Frame", {
 		BackgroundColor3 = config.Color,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(14, 14),
-		Size = UDim2.fromOffset(42, 42),
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(40, 40),
 	}, card)
 	new("UICorner", { CornerRadius = UDim.new(0, 11) }, swatch)
 
 	local itemName = new("TextLabel", {
 		BackgroundTransparency = 1,
-		Font = Enum.Font.GothamBold,
-		Position = UDim2.fromOffset(66, 12),
-		Size = UDim2.new(1, -78, 0, 42),
+		Font = Enum.Font.GothamBlack,
+		Position = UDim2.fromOffset(62, 11),
+		Size = UDim2.new(1, -72, 0, 38),
 		Text = config.Name,
 		TextColor3 = Color3.fromRGB(24, 29, 31),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	}, card)
 	new("UITextSizeConstraint", {
-		MaxTextSize = 17,
+		MaxTextSize = 16,
 		MinTextSize = 9,
 	}, itemName)
 
-	local statsText
+	local statText
 	if category == "Tool" then
-		statsText = tostring(config.Damage) .. " Damage\n" .. tostring(config.Range) .. " Range"
+		statText = tostring(config.Damage) .. " DMG  |  " .. tostring(config.Range) .. " RNG"
 	else
-		statsText = tostring(config.Capacity) .. " Capacity"
+		statText = formatNumber(config.Capacity) .. " Capacity"
 	end
 
 	local stats = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamMedium,
-		Position = UDim2.fromOffset(14, 66),
-		Size = UDim2.new(1, -28, 0, 44),
-		Text = statsText,
-		TextColor3 = Color3.fromRGB(79, 89, 94),
+		Position = UDim2.fromOffset(12, 62),
+		Size = UDim2.new(1, -24, 0, 24),
+		Text = statText,
+		TextColor3 = Color3.fromRGB(70, 80, 85),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
 	}, card)
 	new("UITextSizeConstraint", {
-		MaxTextSize = 15,
+		MaxTextSize = 13,
 		MinTextSize = 8,
 	}, stats)
 
 	local price = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
-		Position = UDim2.fromOffset(14, 116),
-		Size = UDim2.new(1, -28, 0, 22),
+		Position = UDim2.fromOffset(12, 91),
+		Size = UDim2.new(1, -24, 0, 22),
 		Text = config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash",
 		TextColor3 = Color3.fromRGB(36, 116, 64),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	}, card)
 	new("UITextSizeConstraint", {
-		MaxTextSize = 14,
+		MaxTextSize = 13,
 		MinTextSize = 8,
 	}, price)
 
-	local buttonText = "Buy"
-	local buttonColor = canAfford and Color3.fromRGB(43, 153, 86) or Color3.fromRGB(150, 158, 162)
-	if owned then
-		buttonText = equipped and "Equipped" or "Equip"
-		buttonColor = equipped and Color3.fromRGB(86, 159, 108) or Color3.fromRGB(58, 113, 204)
-	end
-
-	local button = new("TextButton", {
-		AutoButtonColor = not equipped,
+	local action = new("TextButton", {
+		AutoButtonColor = buttonText ~= "Equipped",
 		BackgroundColor3 = buttonColor,
 		BorderSizePixel = 0,
-		Font = Enum.Font.GothamBold,
-		Position = UDim2.new(0, 14, 1, -42),
-		Size = UDim2.new(1, -28, 0, 30),
+		Font = Enum.Font.GothamBlack,
+		Position = UDim2.new(0, 12, 1, -38),
+		Size = UDim2.new(1, -24, 0, 28),
 		Text = buttonText,
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		TextScaled = true,
 	}, card)
-	new("UICorner", { CornerRadius = UDim.new(0, 10) }, button)
+	new("UICorner", { CornerRadius = UDim.new(0, 10) }, action)
 	new("UITextSizeConstraint", {
-		MaxTextSize = 15,
+		MaxTextSize = 14,
 		MinTextSize = 8,
-	}, button)
+	}, action)
 
-	button.Activated:Connect(function()
-		if equipped then
-			return
-		end
+	card.Activated:Connect(function()
+		selectItem(category, itemId)
+	end)
 
-		if owned then
-			equipItemRemote:FireServer(category, itemId)
-		else
-			buyItemRemote:FireServer(category, itemId)
-		end
+	action.Activated:Connect(function()
+		selectItem(category, itemId)
+		triggerSelectedAction()
 	end)
 end
 
 local function refreshTabs()
 	for tabName, button in pairs(tabButtons) do
 		local selected = tabName == activeTab
-		button.BackgroundColor3 = selected and Color3.fromRGB(38, 45, 49) or Color3.fromRGB(220, 226, 226)
+		button.BackgroundColor3 = selected and Color3.fromRGB(37, 44, 48) or Color3.fromRGB(220, 228, 228)
 		button.TextColor3 = selected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(39, 45, 48)
 	end
 end
@@ -324,16 +570,18 @@ local function refreshGrid()
 			createItemCard("Backpack", backpackId, GameData.Backpacks[backpackId], index)
 		end
 	end
+
+	refreshDetails()
 end
 
-local function createTab(tabName, text, layoutOrder)
+local function createTab(tabName, text, category, firstItemId, layoutOrder)
 	local button = new("TextButton", {
 		AutoButtonColor = true,
-		BackgroundColor3 = Color3.fromRGB(220, 226, 226),
+		BackgroundColor3 = Color3.fromRGB(220, 228, 228),
 		BorderSizePixel = 0,
-		Font = Enum.Font.GothamBold,
+		Font = Enum.Font.GothamBlack,
 		LayoutOrder = layoutOrder,
-		Size = UDim2.fromOffset(128, 40),
+		Size = UDim2.fromOffset(136, 40),
 		Text = text,
 		TextColor3 = Color3.fromRGB(39, 45, 48),
 		TextScaled = true,
@@ -346,14 +594,17 @@ local function createTab(tabName, text, layoutOrder)
 
 	button.Activated:Connect(function()
 		activeTab = tabName
+		selectItem(category, firstItemId)
 		refreshGrid()
 	end)
 
 	tabButtons[tabName] = button
 end
 
-createTab("Tools", "Tools", 1)
-createTab("Backpacks", "Backpacks", 2)
+createTab("Tools", "Tools", "Tool", GameData.ToolOrder[1], 1)
+createTab("Backpacks", "Backpacks", "Backpack", GameData.BackpackOrder[1], 2)
+
+detailAction.Activated:Connect(triggerSelectedAction)
 
 local openTween = nil
 local function openShop()
@@ -395,16 +646,48 @@ shopStateRemote.OnClientEvent:Connect(function(isOpen)
 end)
 
 if playerDataRemote then
-	playerDataRemote.OnClientEvent:Connect(refreshGrid)
-end
-
-if purchaseResultRemote then
-	purchaseResultRemote.OnClientEvent:Connect(function()
+	playerDataRemote.OnClientEvent:Connect(function()
 		refreshGrid()
 	end)
 end
 
-playerData.DescendantAdded:Connect(refreshGrid)
+if purchaseResultRemote then
+	purchaseResultRemote.OnClientEvent:Connect(function(ok, reason, category, itemId)
+		local config = getConfig(category, itemId)
+		local itemName = config and config.Name or tostring(itemId)
+
+		if ok then
+			if reason == "Bought" then
+				showNotification("Bought " .. itemName, Color3.fromRGB(136, 255, 164))
+			elseif reason == "Equipped" then
+				showNotification("Equipped " .. itemName, Color3.fromRGB(179, 212, 255))
+			else
+				showNotification("Updated " .. itemName, Color3.fromRGB(220, 235, 255))
+			end
+		else
+			local message = "Could not buy " .. itemName
+			if reason == "NotEnoughCash" then
+				message = "Not enough Cash for " .. itemName
+			elseif reason == "UnknownCategory" then
+				message = "Shop category is invalid"
+			elseif reason == "DataMissing" then
+				message = "Player data is not ready"
+			end
+			warn("[ShopClient]", message, "reason:", reason)
+			showNotification(message, Color3.fromRGB(255, 177, 137))
+		end
+
+		refreshGrid()
+	end)
+end
+
+playerData.DescendantAdded:Connect(function(descendant)
+	if descendant:IsA("ValueBase") then
+		descendant.Changed:Connect(refreshGrid)
+	end
+	refreshGrid()
+end)
+
 for _, descendant in ipairs(playerData:GetDescendants()) do
 	if descendant:IsA("ValueBase") then
 		descendant.Changed:Connect(refreshGrid)
@@ -413,6 +696,13 @@ end
 
 local leaderstats = player:WaitForChild("leaderstats", 10)
 if leaderstats then
+	leaderstats.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("ValueBase") then
+			descendant.Changed:Connect(refreshGrid)
+		end
+		refreshGrid()
+	end)
+
 	for _, descendant in ipairs(leaderstats:GetDescendants()) do
 		if descendant:IsA("ValueBase") then
 			descendant.Changed:Connect(refreshGrid)

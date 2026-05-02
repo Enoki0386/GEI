@@ -2,6 +2,7 @@ local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -32,6 +33,7 @@ if not requestAttackRemote or not equipItemRemote or not playerData then
 end
 
 local localCooldownUntil = 0
+local activeSwingTween = nil
 
 local function getRootPart()
 	local character = player.Character
@@ -156,6 +158,51 @@ local function playTargetFlash(target)
 	Debris:AddItem(highlight, 0.12)
 end
 
+local function playToolSwing()
+	local character = player.Character
+	local toolConfig = getEquippedToolConfig()
+	if not character or not toolConfig then
+		return
+	end
+
+	local visual = character:FindFirstChild("GEIToolVisual")
+	local weld = visual and visual:FindFirstChild("ToolWeld")
+	if not weld or not weld:IsA("Weld") then
+		return
+	end
+
+	if activeSwingTween then
+		activeSwingTween:Cancel()
+		activeSwingTween = nil
+	end
+
+	local visualConfig = toolConfig.Visual or {}
+	local baseGrip = visualConfig.GripOffset or weld.C0
+	local swingOffset = visualConfig.SwingOffset or (CFrame.new(0, -0.1, -0.45) * CFrame.Angles(math.rad(-30), 0, math.rad(-12)))
+	weld.C0 = baseGrip
+
+	local outTween = TweenService:Create(weld, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		C0 = baseGrip * swingOffset,
+	})
+	local inTween = TweenService:Create(weld, TweenInfo.new(0.11, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		C0 = baseGrip,
+	})
+
+	activeSwingTween = outTween
+	outTween:Play()
+	outTween.Completed:Connect(function()
+		if weld.Parent then
+			activeSwingTween = inTween
+			inTween:Play()
+		end
+	end)
+	inTween.Completed:Connect(function()
+		if activeSwingTween == inTween then
+			activeSwingTween = nil
+		end
+	end)
+end
+
 local function requestAttack()
 	local now = os.clock()
 	local toolConfig = getEquippedToolConfig()
@@ -169,6 +216,7 @@ local function requestAttack()
 	end
 
 	localCooldownUntil = now + math.max(0.08, toolConfig.Cooldown * 0.65)
+	playToolSwing()
 	playTargetFlash(target)
 	requestAttackRemote:FireServer(target)
 end
@@ -217,15 +265,18 @@ RunService.RenderStepped:Connect(function()
 
 	local range = getToolRange()
 	local timeNow = os.clock()
+	local ringConfig = GameData.InteractionRing
 
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
 			local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
 			local ring = wasteModel:FindFirstChild("RangeRing")
 			if hitbox and ring then
-				local radius = math.clamp(wasteModel:GetAttribute("RingRadius") or GameData.Spawn.DefaultRingRadius, 4, GameData.Spawn.MaxRingRadius)
+				local distanceToWaste = (root.Position - hitbox.Position).Magnitude
+				local visible = distanceToWaste <= ringConfig.DisplayDistance
+				local radius = math.clamp(wasteModel:GetAttribute("RingRadius") or ringConfig.DefaultRadius, 4, ringConfig.MaxRadius)
 				local inRange = (root.Position - hitbox.Position).Magnitude <= range + math.max(hitbox.Size.X, hitbox.Size.Z) / 2
-				local visualRadius = radius + (inRange and 0.45 or 0)
+				local visualRadius = radius + (inRange and ringConfig.InRangeRadiusBoost or 0)
 				local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + 0.12, hitbox.Position.Z)
 
 				for _, segment in ipairs(ring:GetChildren()) do
@@ -240,14 +291,13 @@ RunService.RenderStepped:Connect(function()
 						end
 
 						local index = segment:GetAttribute("SegmentIndex") or 1
-						local count = segment:GetAttribute("SegmentCount") or GameData.Spawn.RingSegmentCount
-						local angle = ((index - 1) / count) * math.pi * 2 + timeNow * 0.42
-						segment.Size = Vector3.new(baseLength * (inRange and 1.15 or 1), 0.08, baseDepth * (inRange and 1.35 or 1))
-						segment.Transparency = inRange and 0.12 or 0.42
-						segment.CFrame = CFrame.new(center)
-							* CFrame.Angles(0, angle, 0)
-							* CFrame.new(0, 0, -visualRadius)
-							* CFrame.Angles(0, math.pi / 2, 0)
+						local count = segment:GetAttribute("SegmentCount") or ringConfig.SegmentCount
+						local angle = ((index - 1) / count) * math.pi * 2 + timeNow * ringConfig.RotationSpeed
+						segment.Size = Vector3.new(baseLength * (inRange and 1.14 or 1), ringConfig.Height, baseDepth * (inRange and 1.25 or 1))
+						segment.Color = inRange and ringConfig.InRangeColor or ringConfig.Color
+						segment.Transparency = visible and (inRange and ringConfig.InRangeTransparency or ringConfig.IdleTransparency) or 1
+						segment.CFrame = CFrame.new(center + Vector3.new(math.cos(angle) * visualRadius, 0, math.sin(angle) * visualRadius))
+							* CFrame.Angles(0, -angle - math.pi / 2, 0)
 					end
 				end
 			end

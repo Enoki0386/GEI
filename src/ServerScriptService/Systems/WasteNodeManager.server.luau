@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local gameDataModule = ReplicatedStorage:WaitForChild("GameData", 10)
@@ -166,10 +167,12 @@ local function findSpawnPosition(surface, wasteZone)
 end
 
 local function createBillboard(hitbox, wasteConfig)
+	local displayConfig = GameData.WasteDisplay
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "WasteBillboard"
 	billboard.AlwaysOnTop = true
-	billboard.Size = UDim2.fromOffset(190, 72)
+	billboard.MaxDistance = displayConfig.BillboardMaxDistance
+	billboard.Size = UDim2.fromOffset(displayConfig.BillboardSize.X, displayConfig.BillboardSize.Y)
 	billboard.StudsOffset = Vector3.new(0, hitbox.Size.Y / 2 + 2.1, 0)
 	billboard.Parent = hitbox
 
@@ -190,32 +193,55 @@ local function createBillboard(hitbox, wasteConfig)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.Position = UDim2.fromOffset(8, 4)
-	nameLabel.Size = UDim2.new(1, -16, 0, 30)
+	nameLabel.Size = UDim2.new(1, -16, 0, 24)
 	nameLabel.Text = wasteConfig.Name
 	nameLabel.TextColor3 = wasteConfig.AccentColor
 	nameLabel.TextScaled = true
 	nameLabel.Parent = frame
 
 	local nameConstraint = Instance.new("UITextSizeConstraint")
-	nameConstraint.MaxTextSize = 20
+	nameConstraint.MaxTextSize = 18
 	nameConstraint.MinTextSize = 10
 	nameConstraint.Parent = nameLabel
 
 	local hpLabel = Instance.new("TextLabel")
 	hpLabel.Name = "HPLabel"
 	hpLabel.BackgroundTransparency = 1
-	hpLabel.Font = Enum.Font.GothamMedium
-	hpLabel.Position = UDim2.fromOffset(8, 36)
-	hpLabel.Size = UDim2.new(1, -16, 0, 28)
-	hpLabel.Text = tostring(wasteConfig.MaxHP) .. " / " .. tostring(wasteConfig.MaxHP)
+	hpLabel.Font = Enum.Font.GothamBlack
+	hpLabel.Position = UDim2.fromOffset(8, 28)
+	hpLabel.Size = UDim2.new(1, -16, 0, 26)
+	hpLabel.Text = tostring(wasteConfig.MaxHP)
 	hpLabel.TextColor3 = Color3.fromRGB(242, 246, 248)
 	hpLabel.TextScaled = true
 	hpLabel.Parent = frame
 
 	local hpConstraint = Instance.new("UITextSizeConstraint")
-	hpConstraint.MaxTextSize = 19
+	hpConstraint.MaxTextSize = 24
 	hpConstraint.MinTextSize = 10
 	hpConstraint.Parent = hpLabel
+
+	local barBack = Instance.new("Frame")
+	barBack.Name = "HPBarBack"
+	barBack.BackgroundColor3 = Color3.fromRGB(44, 49, 51)
+	barBack.BorderSizePixel = 0
+	barBack.Position = UDim2.new(0, 12, 1, -16)
+	barBack.Size = UDim2.new(1, -24, 0, displayConfig.HPBarHeight)
+	barBack.Parent = frame
+
+	local barBackCorner = Instance.new("UICorner")
+	barBackCorner.CornerRadius = UDim.new(1, 0)
+	barBackCorner.Parent = barBack
+
+	local barFill = Instance.new("Frame")
+	barFill.Name = "HPBarFill"
+	barFill.BackgroundColor3 = wasteConfig.AccentColor
+	barFill.BorderSizePixel = 0
+	barFill.Size = UDim2.fromScale(1, 1)
+	barFill.Parent = barBack
+
+	local barFillCorner = Instance.new("UICorner")
+	barFillCorner.CornerRadius = UDim.new(1, 0)
+	barFillCorner.Parent = barFill
 end
 
 local function updateHPBillboard(wasteModel)
@@ -227,22 +253,30 @@ local function updateHPBillboard(wasteModel)
 	local billboard = hitbox:FindFirstChild("WasteBillboard")
 	local frame = billboard and billboard:FindFirstChild("Frame")
 	local hpLabel = frame and frame:FindFirstChild("HPLabel")
+	local barBack = frame and frame:FindFirstChild("HPBarBack")
+	local barFill = barBack and barBack:FindFirstChild("HPBarFill")
+	local currentHP = math.max(0, math.floor(wasteModel:GetAttribute("CurrentHP") or 0))
+	local maxHP = math.max(1, math.floor(wasteModel:GetAttribute("MaxHP") or 1))
+
 	if hpLabel and hpLabel:IsA("TextLabel") then
-		local currentHP = math.max(0, math.floor(wasteModel:GetAttribute("CurrentHP") or 0))
-		local maxHP = math.max(1, math.floor(wasteModel:GetAttribute("MaxHP") or 1))
-		hpLabel.Text = tostring(currentHP) .. " / " .. tostring(maxHP)
+		hpLabel.Text = tostring(currentHP)
+	end
+
+	if barFill and barFill:IsA("Frame") then
+		barFill.Size = UDim2.fromScale(math.clamp(currentHP / maxHP, 0, 1), 1)
 	end
 end
 
 local function createRangeRing(wasteModel, hitbox, wasteConfig)
+	local ringConfig = GameData.InteractionRing
 	local ringFolder = Instance.new("Folder")
 	ringFolder.Name = "RangeRing"
 	ringFolder.Parent = wasteModel
 
-	local radius = math.clamp(wasteConfig.RingRadius or GameData.Spawn.DefaultRingRadius, 4, GameData.Spawn.MaxRingRadius)
-	local segmentCount = GameData.Spawn.RingSegmentCount
-	local segmentLength = math.max(0.9, (2 * math.pi * radius) / (segmentCount * 2.4))
-	local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + 0.12, hitbox.Position.Z)
+	local radius = math.clamp(wasteConfig.RingRadius or ringConfig.DefaultRadius, 4, ringConfig.MaxRadius)
+	local segmentCount = ringConfig.SegmentCount
+	local segmentLength = ringConfig.SegmentLength
+	local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + 0.14, hitbox.Position.Z)
 
 	wasteModel:SetAttribute("RingRadius", radius)
 	wasteModel:SetAttribute("RingSegmentCount", segmentCount)
@@ -255,18 +289,91 @@ local function createRangeRing(wasteModel, hitbox, wasteConfig)
 		segment.CanCollide = false
 		segment.CanQuery = false
 		segment.CanTouch = false
-		segment.Color = wasteConfig.AccentColor
+		segment.Color = ringConfig.Color or wasteConfig.AccentColor
 		segment.Material = Enum.Material.Neon
-		segment.Size = Vector3.new(segmentLength, 0.08, 0.18)
-		segment.Transparency = 0.42
+		segment.Size = Vector3.new(segmentLength, ringConfig.Height, ringConfig.Thickness)
+		segment.Transparency = ringConfig.IdleTransparency
 		segment:SetAttribute("SegmentIndex", index)
 		segment:SetAttribute("SegmentCount", segmentCount)
-		segment.CFrame = CFrame.new(center)
-			* CFrame.Angles(0, angle, 0)
-			* CFrame.new(0, 0, -radius)
-			* CFrame.Angles(0, math.pi / 2, 0)
+		segment.CFrame = CFrame.new(center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius))
+			* CFrame.Angles(0, -angle - math.pi / 2, 0)
 		segment.Parent = ringFolder
 	end
+end
+
+local function createConfiguredVisual(wasteModel, hitbox, wasteConfig)
+	if type(wasteConfig.ModelName) ~= "string" or wasteConfig.ModelName == "" then
+		return false
+	end
+
+	local modelsFolder = ReplicatedStorage:FindFirstChild("WasteModels")
+	local sourceModel = modelsFolder and modelsFolder:FindFirstChild(wasteConfig.ModelName)
+	if not sourceModel or not sourceModel:IsA("Model") then
+		return false
+	end
+
+	local visualModel = sourceModel:Clone()
+	visualModel.Name = "VisualModel"
+	visualModel.Parent = wasteModel
+	visualModel:PivotTo(CFrame.new(hitbox.Position))
+
+	for _, descendant in ipairs(visualModel:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			descendant.CanTouch = false
+		end
+	end
+
+	hitbox.Transparency = 1
+	return true
+end
+
+local function createFallbackVisual(wasteModel, hitbox, wasteConfig)
+	local accent = Instance.new("Part")
+	accent.Name = "Accent"
+	accent.Anchored = true
+	accent.CanCollide = false
+	accent.CanTouch = false
+	accent.Color = wasteConfig.AccentColor
+	accent.Material = Enum.Material.SmoothPlastic
+	accent.Position = hitbox.Position + Vector3.new(0.6, hitbox.Size.Y * 0.3, -0.4)
+	accent.Shape = Enum.PartType.Ball
+	accent.Size = hitbox.Size * 0.42
+	accent.Parent = wasteModel
+end
+
+local function playHitFeedback(wasteModel)
+	local displayConfig = GameData.WasteDisplay
+	local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
+	if not hitbox then
+		return
+	end
+
+	local baseSize = hitbox:GetAttribute("BaseSize") or hitbox.Size
+	hitbox:SetAttribute("BaseSize", baseSize)
+
+	local originalCFrame = hitbox.CFrame
+	local offset = Vector3.new(random:NextNumber(-1, 1), 0, random:NextNumber(-1, 1))
+	if offset.Magnitude > 0 then
+		offset = offset.Unit * displayConfig.HitShakeDistance
+	end
+
+	local outTween = TweenService:Create(hitbox, TweenInfo.new(displayConfig.HitTweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		CFrame = originalCFrame + offset,
+		Size = baseSize * displayConfig.HitScaleAmount,
+	})
+	local inTween = TweenService:Create(hitbox, TweenInfo.new(displayConfig.HitTweenTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		CFrame = originalCFrame,
+		Size = baseSize,
+	})
+
+	outTween:Play()
+	outTween.Completed:Connect(function()
+		if hitbox.Parent then
+			inTween:Play()
+		end
+	end)
 end
 
 local function createWasteNode(spawnPosition, wasteZone)
@@ -278,6 +385,7 @@ local function createWasteNode(spawnPosition, wasteZone)
 	model.Name = wasteConfig.Name
 	model:SetAttribute("GEIWasteNode", true)
 	model:SetAttribute("WasteId", wasteId)
+	model:SetAttribute("ModelName", wasteConfig.ModelName or "")
 	model:SetAttribute("Rarity", wasteConfig.Rarity)
 	model:SetAttribute("CurrentHP", wasteConfig.MaxHP)
 	model:SetAttribute("MaxHP", wasteConfig.MaxHP)
@@ -297,19 +405,10 @@ local function createWasteNode(spawnPosition, wasteZone)
 	hitbox.Size = size
 	hitbox.Parent = model
 
-	local accent = Instance.new("Part")
-	accent.Name = "Accent"
-	accent.Anchored = true
-	accent.CanCollide = false
-	accent.CanTouch = false
-	accent.Color = wasteConfig.AccentColor
-	accent.Material = Enum.Material.SmoothPlastic
-	accent.Position = hitboxPosition + Vector3.new(0.6, size.Y * 0.3, -0.4)
-	accent.Shape = Enum.PartType.Ball
-	accent.Size = size * 0.42
-	accent.Parent = model
-
 	model.PrimaryPart = hitbox
+	if not createConfiguredVisual(model, hitbox, wasteConfig) then
+		createFallbackVisual(model, hitbox, wasteConfig)
+	end
 	createBillboard(hitbox, wasteConfig)
 	createRangeRing(model, hitbox, wasteConfig)
 	model.Parent = wasteZone
@@ -395,6 +494,7 @@ local function handleAttack(player, target)
 	local newHP = math.max(0, currentHP - toolDamage.Value)
 	wasteModel:SetAttribute("CurrentHP", newHP)
 	updateHPBillboard(wasteModel)
+	playHitFeedback(wasteModel)
 
 	fireClient(player, "TutorialProgress", "ClickedWaste")
 

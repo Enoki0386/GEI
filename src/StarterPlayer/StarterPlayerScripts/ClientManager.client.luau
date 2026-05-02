@@ -67,11 +67,11 @@ end
 local topStats = new("Frame", {
 	Name = "TopStats",
 	AnchorPoint = Vector2.new(0.5, 0),
-	BackgroundColor3 = Color3.fromRGB(20, 24, 26),
-	BackgroundTransparency = 0.08,
+	BackgroundColor3 = Color3.fromRGB(16, 21, 25),
+	BackgroundTransparency = 0.04,
 	BorderSizePixel = 0,
 	Position = UDim2.new(0.5, 0, 0, 8),
-	Size = UDim2.fromOffset(438, 46),
+	Size = UDim2.fromOffset(504, 52),
 }, gui)
 topStats:SetAttribute("GEIClientManaged", true)
 
@@ -85,7 +85,7 @@ new("UIStroke", {
 local statLayout = new("UIListLayout", {
 	FillDirection = Enum.FillDirection.Horizontal,
 	HorizontalAlignment = Enum.HorizontalAlignment.Center,
-	Padding = UDim.new(0, 8),
+	Padding = UDim.new(0, 10),
 	SortOrder = Enum.SortOrder.LayoutOrder,
 	VerticalAlignment = Enum.VerticalAlignment.Center,
 }, topStats)
@@ -100,23 +100,31 @@ local statLabels = {}
 local function createStatPill(name, title, color, layoutOrder)
 	local pill = new("Frame", {
 		Name = name,
-		BackgroundColor3 = Color3.fromRGB(34, 39, 42),
+		BackgroundColor3 = Color3.fromRGB(31, 38, 43),
 		BorderSizePixel = 0,
 		LayoutOrder = layoutOrder,
-		Size = UDim2.fromOffset(134, 34),
+		Size = UDim2.fromOffset(154, 38),
 	}, topStats)
-	new("UICorner", { CornerRadius = UDim.new(0, 11) }, pill)
+	new("UICorner", { CornerRadius = UDim.new(0, 12) }, pill)
 	new("UIStroke", {
 		Color = color,
-		Thickness = 1.3,
-		Transparency = 0.28,
+		Thickness = 1.5,
+		Transparency = 0.22,
 	}, pill)
+
+	local accent = new("Frame", {
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(7, 8),
+		Size = UDim2.fromOffset(5, 22),
+	}, pill)
+	new("UICorner", { CornerRadius = UDim.new(1, 0) }, accent)
 
 	local titleLabel = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
-		Position = UDim2.fromOffset(10, 3),
-		Size = UDim2.new(0.42, -8, 1, -6),
+		Position = UDim2.fromOffset(18, 4),
+		Size = UDim2.new(0.4, -8, 1, -8),
 		Text = title,
 		TextColor3 = color,
 		TextScaled = true,
@@ -129,9 +137,9 @@ local function createStatPill(name, title, color, layoutOrder)
 
 	local valueLabel = new("TextLabel", {
 		BackgroundTransparency = 1,
-		Font = Enum.Font.GothamBold,
-		Position = UDim2.new(0.42, 0, 0, 3),
-		Size = UDim2.new(0.58, -10, 1, -6),
+		Font = Enum.Font.GothamBlack,
+		Position = UDim2.new(0.42, 0, 0, 4),
+		Size = UDim2.new(0.58, -12, 1, -8),
 		Text = "0",
 		TextColor3 = Color3.fromRGB(244, 247, 248),
 		TextScaled = true,
@@ -152,8 +160,8 @@ createStatPill("Diamonds", "Diamonds", Color3.fromRGB(126, 216, 255), 3)
 local toolbar = new("Frame", {
 	Name = "ToolBar",
 	AnchorPoint = Vector2.new(0.5, 1),
-	BackgroundColor3 = Color3.fromRGB(21, 24, 27),
-	BackgroundTransparency = 0.08,
+	BackgroundColor3 = Color3.fromRGB(17, 21, 25),
+	BackgroundTransparency = 0.03,
 	BorderSizePixel = 0,
 	Position = UDim2.new(0.5, 0, 1, -22),
 	Size = UDim2.fromOffset(106, 86),
@@ -163,7 +171,7 @@ new("UICorner", { CornerRadius = UDim.new(0, 16) }, toolbar)
 new("UIStroke", {
 	Color = Color3.fromRGB(255, 255, 255),
 	Thickness = 1,
-	Transparency = 0.76,
+	Transparency = 0.62,
 }, toolbar)
 
 local slotsFrame = new("Frame", {
@@ -235,7 +243,7 @@ local function refreshToolbar()
 	local equippedToolValue = playerData:FindFirstChild("EquippedTool")
 	local equippedTool = equippedToolValue and equippedToolValue.Value or "Brush"
 	local slotCount = math.max(1, #ownedTools)
-	toolbar.Size = UDim2.fromOffset(math.max(106, slotCount * 88 + 18), 86)
+	toolbar.Size = UDim2.fromOffset(math.max(112, slotCount * 90 + 20), 88)
 
 	new("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
@@ -258,25 +266,50 @@ local function refreshToolbar()
 		local button = new("TextButton", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			AutoButtonColor = true,
-			BackgroundColor3 = selected and toolConfig.Color or Color3.fromRGB(43, 48, 52),
+			BackgroundColor3 = selected and Color3.fromRGB(43, 50, 55) or Color3.fromRGB(31, 36, 40),
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamBold,
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = selected and UDim2.fromOffset(70, 64) or UDim2.fromOffset(62, 56),
+			Size = selected and UDim2.fromOffset(72, 66) or UDim2.fromOffset(64, 58),
 			Text = toolConfig.Name .. "\n" .. tostring(toolConfig.Damage) .. " DMG",
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 			TextScaled = true,
 		}, slot)
 		new("UICorner", { CornerRadius = UDim.new(0, 13) }, button)
 		new("UIStroke", {
-			Color = selected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(122, 132, 139),
-			Thickness = selected and 2.4 or 1,
-			Transparency = selected and 0.05 or 0.5,
+			Color = selected and toolConfig.Color or Color3.fromRGB(110, 121, 128),
+			Thickness = selected and 2.5 or 1,
+			Transparency = selected and 0.02 or 0.48,
 		}, button)
 		new("UITextSizeConstraint", {
 			MaxTextSize = 15,
 			MinTextSize = 8,
 		}, button)
+
+		local keyBadge = new("TextLabel", {
+			BackgroundColor3 = Color3.fromRGB(14, 17, 20),
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamBlack,
+			Position = UDim2.fromOffset(6, 6),
+			Size = UDim2.fromOffset(18, 18),
+			Text = tostring(index),
+			TextColor3 = Color3.fromRGB(225, 232, 235),
+			TextScaled = true,
+		}, button)
+		new("UICorner", { CornerRadius = UDim.new(0, 6) }, keyBadge)
+		new("UITextSizeConstraint", {
+			MaxTextSize = 11,
+			MinTextSize = 7,
+		}, keyBadge)
+
+		local colorStrip = new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			BackgroundColor3 = toolConfig.Color,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 1, -6),
+			Size = UDim2.new(1, -18, 0, 4),
+		}, button)
+		new("UICorner", { CornerRadius = UDim.new(1, 0) }, colorStrip)
 
 		button.Activated:Connect(function()
 			if equipItemRemote then
@@ -367,7 +400,7 @@ if attackFeedbackRemote then
 end
 
 statLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	topStats.Size = UDim2.fromOffset(math.max(438, statLayout.AbsoluteContentSize.X + 24), 46)
+	topStats.Size = UDim2.fromOffset(math.max(504, statLayout.AbsoluteContentSize.X + 28), 52)
 end)
 
 refreshAll()

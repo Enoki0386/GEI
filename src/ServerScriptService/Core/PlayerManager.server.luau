@@ -17,6 +17,7 @@ local DATASTORE_KEY_PREFIX = "Player_"
 
 local dataStore = nil
 local dataStoreDisabled = false
+local dataStoreWarningShown = false
 local dataFoldersByPlayer = {}
 
 local function getRemote(remoteName)
@@ -35,6 +36,15 @@ local function fireClient(player, remoteName, ...)
 	end
 end
 
+local function warnDataStoreOnce(...)
+	if dataStoreWarningShown then
+		return
+	end
+
+	dataStoreWarningShown = true
+	warn(...)
+end
+
 local function getDataStore()
 	if dataStoreDisabled then
 		return nil
@@ -50,7 +60,7 @@ local function getDataStore()
 
 	if not ok then
 		dataStoreDisabled = true
-		warn("[GEI] DataStore unavailable. Studio-safe memory data will be used:", storeOrError)
+		warnDataStoreOnce("[GEI] DataStore unavailable. Studio-safe memory data will be used:", storeOrError)
 		return nil
 	end
 
@@ -142,7 +152,7 @@ local function loadSaveData(player)
 
 	if not ok then
 		dataStoreDisabled = true
-		warn("[GEI] Could not load DataStore data. Using Studio-safe defaults for this session:", savedDataOrError)
+		warnDataStoreOnce("[GEI] Could not load DataStore data. Using Studio-safe defaults for this session:", savedDataOrError)
 		return createDefaultSaveData()
 	end
 
@@ -302,7 +312,7 @@ local function savePlayer(player)
 
 	if not ok then
 		dataStoreDisabled = true
-		warn("[GEI] Could not save player data. The game keeps running:", errorMessage)
+		warnDataStoreOnce("[GEI] Could not save player data. The game keeps running:", errorMessage)
 	end
 end
 
@@ -346,6 +356,26 @@ end
 
 local PlayerManager = {}
 
+local function normalizeCategory(category)
+	if category == "Tool" or category == "Tools" then
+		return "Tool"
+	elseif category == "Backpack" or category == "Backpacks" then
+		return "Backpack"
+	end
+
+	return nil
+end
+
+local function getOwnedFolder(dataFolder, category)
+	if category == "Tool" then
+		return dataFolder:FindFirstChild("OwnedTools")
+	elseif category == "Backpack" then
+		return dataFolder:FindFirstChild("OwnedBackpacks")
+	end
+
+	return nil
+end
+
 function PlayerManager.GetDataFolder(player)
 	return getPlayerDataFolder(player)
 end
@@ -378,6 +408,11 @@ function PlayerManager.EquipTool(player, toolId)
 	dataFolder.EquippedTool.Value = tool.Id
 	updateDerivedStats(player)
 	pushPlayerData(player)
+
+	if _G.GEI.ToolVisualManager and _G.GEI.ToolVisualManager.Attach then
+		task.defer(_G.GEI.ToolVisualManager.Attach, player)
+	end
+
 	return true
 end
 
@@ -400,15 +435,23 @@ function PlayerManager.EquipBackpack(player, backpackId)
 end
 
 function PlayerManager.BuyItem(player, category, itemId)
+	category = normalizeCategory(category)
 	local leaderstats = getLeaderstats(player)
 	local dataFolder = getPlayerDataFolder(player)
 	if not leaderstats or not dataFolder then
+		warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: DataMissing")
 		return false, "DataMissing"
+	end
+
+	if not category then
+		warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: UnknownCategory")
+		return false, "UnknownCategory"
 	end
 
 	if category == "Tool" then
 		local tool = GameData.GetTool(itemId)
 		if not tool then
+			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: UnknownTool")
 			return false, "UnknownTool"
 		end
 		if PlayerManager.HasTool(player, itemId) then
@@ -416,17 +459,25 @@ function PlayerManager.BuyItem(player, category, itemId)
 			return true, "Equipped"
 		end
 		if leaderstats.Cash.Value < tool.Price then
+			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: NotEnoughCash")
 			return false, "NotEnoughCash"
 		end
 
+		local ownedFolder = getOwnedFolder(dataFolder, category)
+		if not ownedFolder then
+			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: OwnedFolderMissing")
+			return false, "DataMissing"
+		end
+
 		leaderstats.Cash.Value -= tool.Price
-		createValue("BoolValue", itemId, true, dataFolder.OwnedTools)
+		createValue("BoolValue", itemId, true, ownedFolder)
 		PlayerManager.EquipTool(player, itemId)
 		pushPlayerData(player)
 		return true, "Bought"
 	elseif category == "Backpack" then
 		local backpack = GameData.GetBackpack(itemId)
 		if not backpack then
+			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: UnknownBackpack")
 			return false, "UnknownBackpack"
 		end
 		if PlayerManager.HasBackpack(player, itemId) then
@@ -434,11 +485,18 @@ function PlayerManager.BuyItem(player, category, itemId)
 			return true, "Equipped"
 		end
 		if leaderstats.Cash.Value < backpack.Price then
+			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: NotEnoughCash")
 			return false, "NotEnoughCash"
 		end
 
+		local ownedFolder = getOwnedFolder(dataFolder, category)
+		if not ownedFolder then
+			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: OwnedFolderMissing")
+			return false, "DataMissing"
+		end
+
 		leaderstats.Cash.Value -= backpack.Price
-		createValue("BoolValue", itemId, true, dataFolder.OwnedBackpacks)
+		createValue("BoolValue", itemId, true, ownedFolder)
 		PlayerManager.EquipBackpack(player, itemId)
 		pushPlayerData(player)
 		return true, "Bought"

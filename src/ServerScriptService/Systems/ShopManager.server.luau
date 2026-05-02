@@ -5,6 +5,16 @@ local Workspace = game:GetService("Workspace")
 local playersInside = {}
 local zoneWarningShown = false
 
+local function normalizeCategory(category)
+	if category == "Tool" or category == "Tools" then
+		return "Tool"
+	elseif category == "Backpack" or category == "Backpacks" then
+		return "Backpack"
+	end
+
+	return nil
+end
+
 local function waitForPlayerManager()
 	while not (_G.GEI and _G.GEI.PlayerManager) do
 		task.wait(0.1)
@@ -67,6 +77,14 @@ end
 
 ensureRemote("BuyItem").OnServerEvent:Connect(function(player, category, itemId)
 	if type(category) ~= "string" or type(itemId) ~= "string" then
+		warn("[ShopManager] Ignored invalid BuyItem request from", player.Name)
+		return
+	end
+
+	category = normalizeCategory(category)
+	if not category then
+		warn("[ShopManager] Invalid shop category from", player.Name, itemId)
+		ensureRemote("PurchaseResult"):FireClient(player, false, "UnknownCategory", "Unknown", itemId)
 		return
 	end
 
@@ -77,6 +95,14 @@ end)
 
 ensureRemote("EquipItem").OnServerEvent:Connect(function(player, category, itemId)
 	if type(category) ~= "string" or type(itemId) ~= "string" then
+		warn("[ShopManager] Ignored invalid EquipItem request from", player.Name)
+		return
+	end
+
+	category = normalizeCategory(category)
+	if not category then
+		warn("[ShopManager] Invalid equip category from", player.Name, itemId)
+		ensureRemote("PurchaseResult"):FireClient(player, false, "UnknownCategory", "Unknown", itemId)
 		return
 	end
 

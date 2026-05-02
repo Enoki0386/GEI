@@ -11,6 +11,13 @@ local GameData = require(gameDataModule)
 
 local REQUIREMENTS = {
 	{
+		Path = "Workspace.LobbyFloor",
+		Name = "LobbyFloor",
+		ExpectedClass = "BasePart",
+		Instruction = "Create a Part named LobbyFloor.",
+		RecommendedSize = GameData.World.LobbyFloor.Size,
+	},
+	{
 		Path = "Workspace.SpawnSurface1",
 		Name = GameData.Spawn.SurfaceName,
 		ExpectedClass = "BasePart",

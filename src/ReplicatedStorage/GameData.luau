@@ -10,9 +10,31 @@ GameData.Spawn = {
 	MinDistanceBetweenWaste = 8,
 	MinDistanceFromPlayers = 12,
 	MaxSpawnAttempts = 45,
-	RingSegmentCount = 28,
-	DefaultRingRadius = 8,
-	MaxRingRadius = 16,
+}
+
+GameData.WasteDisplay = {
+	BillboardMaxDistance = 45,
+	BillboardSize = Vector2.new(180, 78),
+	HPBarHeight = 8,
+	HitShakeDistance = 0.18,
+	HitScaleAmount = 1.08,
+	HitTweenTime = 0.08,
+}
+
+GameData.InteractionRing = {
+	SegmentCount = 36,
+	DefaultRadius = 8,
+	MaxRadius = 15,
+	SegmentLength = 1.25,
+	Thickness = 0.18,
+	Height = 0.06,
+	RotationSpeed = 0.55,
+	DisplayDistance = 70,
+	IdleTransparency = 0.45,
+	InRangeTransparency = 0.1,
+	InRangeRadiusBoost = 0.4,
+	Color = Color3.fromRGB(255, 238, 131),
+	InRangeColor = Color3.fromRGB(125, 255, 159),
 }
 
 GameData.Economy = {
@@ -23,6 +45,11 @@ GameData.Economy = {
 }
 
 GameData.World = {
+	LobbyFloor = {
+		Position = Vector3.new(0, 0, 0),
+		Size = Vector3.new(120, 2, 120),
+		Color = Color3.fromRGB(112, 123, 118),
+	},
 	SpawnSurface = {
 		Position = Vector3.new(0, 1, 20),
 		Size = Vector3.new(80, 1, 60),
@@ -58,7 +85,13 @@ GameData.Tools = {
 		Range = 18,
 		Cooldown = 0.45,
 		Color = Color3.fromRGB(245, 190, 86),
-		Description = "Starter cleaner.",
+		Description = "A trusty starter brush for cleaning small piles.",
+		Visual = {
+			HandleColor = Color3.fromRGB(242, 178, 80),
+			BristleColor = Color3.fromRGB(232, 239, 224),
+			GripOffset = CFrame.new(0.55, -0.75, -0.35) * CFrame.Angles(math.rad(-70), math.rad(18), math.rad(12)),
+			SwingOffset = CFrame.new(0.1, -0.15, -0.55) * CFrame.Angles(math.rad(-35), math.rad(0), math.rad(-18)),
+		},
 	},
 	Crusher = {
 		Id = "Crusher",
@@ -68,7 +101,13 @@ GameData.Tools = {
 		Range = 20,
 		Cooldown = 0.5,
 		Color = Color3.fromRGB(237, 103, 88),
-		Description = "Breaks tougher piles faster.",
+		Description = "A heavier cleaner that breaks tougher piles faster.",
+		Visual = {
+			HandleColor = Color3.fromRGB(95, 98, 104),
+			BristleColor = Color3.fromRGB(237, 103, 88),
+			GripOffset = CFrame.new(0.6, -0.72, -0.36) * CFrame.Angles(math.rad(-68), math.rad(14), math.rad(10)),
+			SwingOffset = CFrame.new(0.12, -0.16, -0.58) * CFrame.Angles(math.rad(-38), math.rad(0), math.rad(-18)),
+		},
 	},
 	VacuumWand = {
 		Id = "VacuumWand",
@@ -78,7 +117,13 @@ GameData.Tools = {
 		Range = 24,
 		Cooldown = 0.42,
 		Color = Color3.fromRGB(95, 211, 210),
-		Description = "Longer range and high damage.",
+		Description = "A long-range wand with strong cleanup power.",
+		Visual = {
+			HandleColor = Color3.fromRGB(55, 73, 92),
+			BristleColor = Color3.fromRGB(95, 211, 210),
+			GripOffset = CFrame.new(0.58, -0.72, -0.36) * CFrame.Angles(math.rad(-72), math.rad(16), math.rad(12)),
+			SwingOffset = CFrame.new(0.1, -0.14, -0.65) * CFrame.Angles(math.rad(-30), math.rad(0), math.rad(-16)),
+		},
 	},
 }
 
@@ -138,6 +183,7 @@ GameData.WasteTypes = {
 		AccentColor = Color3.fromRGB(184, 229, 112),
 		RingRadius = 7,
 		VisualSize = Vector3.new(4, 2.4, 4),
+		ModelName = nil,
 	},
 	RareWaste = {
 		Id = "RareWaste",
@@ -152,6 +198,7 @@ GameData.WasteTypes = {
 		AccentColor = Color3.fromRGB(136, 205, 255),
 		RingRadius = 9,
 		VisualSize = Vector3.new(5, 3, 5),
+		ModelName = nil,
 	},
 	EpicWaste = {
 		Id = "EpicWaste",
@@ -166,7 +213,15 @@ GameData.WasteTypes = {
 		AccentColor = Color3.fromRGB(222, 171, 255),
 		RingRadius = 11,
 		VisualSize = Vector3.new(6, 3.6, 6),
+		ModelName = nil,
 	},
+}
+
+GameData.FutureUnits = {
+	Enabled = false,
+	DisplayName = "Assistants",
+	Slots = 3,
+	Types = {},
 }
 
 function GameData.GetTool(toolId)
