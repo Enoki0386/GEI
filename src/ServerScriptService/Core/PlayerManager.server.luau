@@ -18,6 +18,7 @@ local DATASTORE_KEY_PREFIX = "Player_"
 local dataStore = nil
 local dataStoreDisabled = false
 local dataStoreWarningShown = false
+local debugPrintShown = false
 local dataFoldersByPlayer = {}
 
 local function getRemote(remoteName)
@@ -91,6 +92,11 @@ local function applyDebugOverrides(saveData)
 	local debugConfig = getDebugConfig()
 	if not debugConfig then
 		return saveData
+	end
+
+	if not debugPrintShown then
+		debugPrintShown = true
+		print("[Debug] Debug mode enabled: giving test values")
 	end
 
 	saveData.Cash = math.max(0, math.floor(debugConfig.StartingCash or saveData.Cash or 0))
@@ -497,6 +503,29 @@ function PlayerManager.ToggleTool(player, toolId)
 
 	local equipped = PlayerManager.EquipTool(player, toolId)
 	return equipped, equipped and "Equipped" or "CannotEquip"
+end
+
+function PlayerManager.ApplyNativeToolState(player, toolId, equipped)
+	local tool = GameData.GetTool(toolId)
+	local dataFolder = getPlayerDataFolder(player)
+	if not tool or not dataFolder or not PlayerManager.HasTool(player, toolId) then
+		return false
+	end
+
+	if equipped then
+		dataFolder.EquippedTool.Value = tool.Id
+		updateDerivedStats(player)
+	end
+
+	local equippedTool = dataFolder:FindFirstChild("EquippedTool")
+	local isToolEquipped = dataFolder:FindFirstChild("IsToolEquipped")
+	if equippedTool and equippedTool.Value == tool.Id and isToolEquipped and isToolEquipped:IsA("BoolValue") then
+		isToolEquipped.Value = equipped == true
+		pushPlayerData(player)
+		return true
+	end
+
+	return false
 end
 
 function PlayerManager.EquipBackpack(player, backpackId)

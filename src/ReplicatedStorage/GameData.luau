@@ -32,18 +32,18 @@ GameData.WasteDisplay = {
 
 GameData.Interaction = {
 	ExtraRangeFromSurface = 2.5,
-	MinRange = 4,
-	MaxRange = 12,
+	MinRange = 3.5,
+	MaxRange = 9,
 }
 
 GameData.InteractionCircle = {
-	SegmentCount = 24,
-	SegmentLengthRatio = 0.55,
-	Thickness = 0.08,
+	SegmentCount = 18,
+	SegmentLengthRatio = 0.62,
+	Thickness = 0.06,
 	HeightOffset = 0.08,
-	RotationSpeed = 25,
-	InRangeScale = 1.08,
-	DisplayDistance = 60,
+	RotationSpeed = 12,
+	InRangeScale = 1.03,
+	DisplayDistance = 55,
 	IdleTransparency = 0.45,
 	InRangeTransparency = 0.1,
 	Color = Color3.fromRGB(255, 238, 131),

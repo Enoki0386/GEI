@@ -160,6 +160,50 @@ local function getToolInstance(player, toolId)
 	return nil
 end
 
+local function applyNativeToolState(player, toolId, equipped)
+	local PlayerManager = _G.GEI and _G.GEI.PlayerManager
+	if PlayerManager and PlayerManager.ApplyNativeToolState then
+		PlayerManager.ApplyNativeToolState(player, toolId, equipped)
+	end
+end
+
+local function hasAnyEquippedNativeTool(player)
+	local character = player.Character
+	if not character then
+		return false
+	end
+
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Tool") and child:GetAttribute("GEINativeTool") == true then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function bindToolSignals(player, tool)
+	if tool:GetAttribute("GEIToolSignalsBound") == true then
+		return
+	end
+
+	tool:SetAttribute("GEIToolSignalsBound", true)
+
+	tool.Equipped:Connect(function()
+		local toolId = tool:GetAttribute("ToolId") or tool.Name
+		applyNativeToolState(player, toolId, true)
+	end)
+
+	tool.Unequipped:Connect(function()
+		local toolId = tool:GetAttribute("ToolId") or tool.Name
+		task.defer(function()
+			if not hasAnyEquippedNativeTool(player) then
+				applyNativeToolState(player, toolId, false)
+			end
+		end)
+	end)
+end
+
 local function syncInventory(player)
 	local dataFolder = waitForDataFolder(player)
 	local backpack = player:FindFirstChildOfClass("Backpack")
@@ -185,8 +229,12 @@ local function syncInventory(player)
 				local template = ensureToolTemplate(toolId)
 				if template then
 					local clone = template:Clone()
+					clone:SetAttribute("GEIToolSignalsBound", nil)
 					clone.Parent = backpack
+					bindToolSignals(player, clone)
 				end
+			else
+				bindToolSignals(player, existing)
 			end
 		elseif existing then
 			existing:Destroy()

@@ -376,7 +376,7 @@ RunService.RenderStepped:Connect(function()
 				local visible = distanceToWaste <= ringConfig.DisplayDistance
 				local radius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(hitbox)
 				local inRange = distanceToWaste <= radius
-				local visualRadius = radius * (inRange and ringConfig.InRangeScale or 1)
+				local visualRadius = radius
 				local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + ringConfig.HeightOffset, hitbox.Position.Z)
 
 				for _, segment in ipairs(ring:GetChildren()) do
@@ -388,9 +388,9 @@ RunService.RenderStepped:Connect(function()
 						local angle = ((index - 1) / count) * math.pi * 2 + timeNow * math.rad(ringConfig.RotationSpeed)
 
 						segment.Size = Vector3.new(
-							baseLength * (inRange and 1.08 or 1),
-							baseThickness * (inRange and 1.35 or 1),
-							baseThickness * (inRange and 1.35 or 1)
+							baseLength * (inRange and ringConfig.InRangeScale or 1),
+							baseThickness * (inRange and 1.25 or 1),
+							baseThickness * (inRange and 1.25 or 1)
 						)
 						segment.Color = inRange and ringConfig.InRangeColor or ringConfig.Color
 						segment.Transparency = visible and (inRange and ringConfig.InRangeTransparency or ringConfig.IdleTransparency) or 1

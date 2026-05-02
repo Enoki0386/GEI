@@ -173,6 +173,13 @@ local toolbar = new("Frame", {
 }, gui)
 toolbar:SetAttribute("GEIClientManaged", true)
 new("UICorner", { CornerRadius = UDim.new(0, 16) }, toolbar)
+new("UIGradient", {
+	Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 30, 35)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(13, 17, 21)),
+	}),
+	Rotation = 90,
+}, toolbar)
 new("UIStroke", {
 	Color = Color3.fromRGB(255, 255, 255),
 	Thickness = 1,
@@ -278,11 +285,18 @@ local function refreshToolbar()
 			Font = Enum.Font.GothamBold,
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = selected and UDim2.fromOffset(72, 66) or UDim2.fromOffset(64, 58),
-			Text = toolConfig.Name .. "\n" .. tostring(toolConfig.Damage) .. " DMG",
+			Text = toolConfig.Name,
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 			TextScaled = true,
 		}, slot)
 		new("UICorner", { CornerRadius = UDim.new(0, 13) }, button)
+		new("UIGradient", {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, selected and Color3.fromRGB(58, 66, 72) or Color3.fromRGB(39, 45, 50)),
+				ColorSequenceKeypoint.new(1, selected and Color3.fromRGB(31, 37, 42) or Color3.fromRGB(25, 30, 34)),
+			}),
+			Rotation = 90,
+		}, button)
 		new("UIStroke", {
 			Color = selected and toolConfig.Color or Color3.fromRGB(110, 121, 128),
 			Thickness = selected and 2.5 or 1,

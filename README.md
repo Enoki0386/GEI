@@ -150,6 +150,79 @@ The code expects these objects:
 
 The game should not crash if the map is incomplete. The related system simply waits or stays disabled until the object exists.
 
+## Manual Roblox Studio Tasks
+
+Use Roblox Studio for visual work. The code should provide gameplay systems, not rebuild your map for you.
+
+### 1. Create or replace the real `Brush` Tool
+
+1. In Roblox Studio, open `ReplicatedStorage`.
+2. Open or create the `Tools` folder.
+3. Insert Object -> `Tool`.
+4. Name it exactly `Brush`.
+5. Inside `Brush`, insert a `Part` named exactly `Handle`.
+6. Build any extra visual parts you want around the Handle.
+7. Attach extra parts to `Handle` with `WeldConstraint`.
+8. Keep `Brush` as a real Roblox `Tool`, not a plain Model.
+
+Expected structure:
+
+```txt
+ReplicatedStorage
+`-- Tools
+    `-- Brush (Tool)
+        |-- Handle (Part)
+        |-- OptionalVisualPart (Part)
+        `-- WeldConstraint
+```
+
+The code uses your `ReplicatedStorage.Tools.Brush` if it exists and has a `Handle`. It only creates a simple fallback Tool when that Tool is missing or invalid.
+
+### 2. Enable native Shift Lock
+
+Rojo sets `StarterPlayer.EnableMouseLockOption = true` in `default.project.json`.
+
+In Roblox Studio you can also check:
+
+1. Select `StarterPlayer`.
+2. Make sure `EnableMouseLockOption` is enabled.
+3. Press Play and use the normal Roblox Shift Lock control.
+
+This uses Roblox's native Shift Lock, not a custom camera system.
+
+### 3. Keep required Workspace objects named correctly
+
+These objects must exist in `Workspace`:
+
+- `SpawnLocation`
+- `LobbyFloor`
+- `SpawnSurface1`
+- `WasteZone`
+- `SellZone`
+- `BuyZone`
+
+You can move, resize, recolor, texture, or replace visual shapes freely. Keep the exact names so the scripts can find them.
+
+### 4. Edit visuals freely
+
+You can freely modify:
+
+- map layout
+- platforms
+- decoration
+- signs
+- materials
+- textures
+- colors
+- Tool model visuals
+- zone visuals
+
+Do not rename the gameplay objects unless you also update `src/ReplicatedStorage/GameData.luau`.
+
+### 5. Change gameplay values in code
+
+Edit `src/ReplicatedStorage/GameData.luau` for most balancing values. The key systems that consume those values are listed in `Where To Edit Values`.
+
 ## What The Scripts Use
 
 - `WasteNodeManager.server.luau` spawns Waste Nodes only on `Workspace.SpawnSurface1`.
@@ -227,6 +300,16 @@ Fast testing is controlled in `src/ReplicatedStorage/GameData.luau`:
 - Circle visuals: `GameData.InteractionCircle`
 
 Set `GameData.Debug.Enabled = false` before publication. While it is `true`, player sessions start with the debug Cash/Diamonds/Waste values so you can test the Shop quickly.
+
+Exact files to edit:
+
+- `src/ReplicatedStorage/GameData.luau`: starting debug values, HP, rewards, tool damage, tool range display stat, shop prices, spawn rate, max Waste count, interaction radius, and circle visuals.
+- `src/ServerScriptService/Core/PlayerManager.server.luau`: how debug values are applied to player data and how Cash/Diamonds/inventory are stored.
+- `src/ServerScriptService/Systems/WasteNodeManager.server.luau`: how Waste Attributes, HP, rewards, hit feedback, and server attack range are enforced.
+- `src/ServerScriptService/Systems/ShopManager.server.luau`: server validation for purchases and equip requests.
+- `src/ServerScriptService/Systems/SpawnManager.server.luau`: required `SpawnSurface1` validation.
+- `src/StarterPlayer/StarterPlayerScripts/ClientManager.client.luau`: toolbar and main HUD visuals.
+- `src/StarterPlayer/StarterPlayerScripts/ToolClient.client.luau`: local attack requests, Tool swing feedback, and interaction circle animation.
 
 Attack range currently comes from each Waste Node's `InteractionRadius` Attribute. The server and circle visual both use:
 
