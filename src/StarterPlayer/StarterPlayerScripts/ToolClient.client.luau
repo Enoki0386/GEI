@@ -33,7 +33,7 @@ if not requestAttackRemote or not equipItemRemote or not playerData then
 end
 
 local localCooldownUntil = 0
-local activeSwingTween = nil
+local activeGripTweens = {}
 
 local function getRootPart()
 	local character = player.Character
@@ -44,20 +44,45 @@ local function getRootPart()
 	return character:FindFirstChild("HumanoidRootPart")
 end
 
-local function getEquippedToolConfig()
+local function getEquippedToolId()
 	local equippedTool = playerData:FindFirstChild("EquippedTool")
-	local toolId = equippedTool and equippedTool.Value or "Brush"
-	return GameData.GetTool(toolId)
+	return equippedTool and equippedTool.Value or "Brush"
 end
 
-local function getToolRange()
-	local toolRange = playerData:FindFirstChild("ToolRange")
-	if toolRange then
-		return toolRange.Value
+local function getEquippedToolConfig()
+	return GameData.GetTool(getEquippedToolId())
+end
+
+local function getEquippedNativeTool()
+	local character = player.Character
+	if not character then
+		return nil
 	end
 
-	local toolConfig = getEquippedToolConfig()
-	return toolConfig and toolConfig.Range or 16
+	local tool = character:FindFirstChild(getEquippedToolId())
+	if tool and tool:IsA("Tool") and tool:GetAttribute("GEINativeTool") == true then
+		return tool
+	end
+
+	return nil
+end
+
+local function isToolEquipped()
+	local equippedValue = playerData:FindFirstChild("IsToolEquipped")
+	return equippedValue ~= nil and equippedValue.Value == true and getEquippedNativeTool() ~= nil
+end
+
+local function getHorizontalDistance(a, b)
+	return (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
+end
+
+local function calculateFallbackInteractionRadius(hitbox)
+	local interactionConfig = GameData.Interaction or {}
+	local halfSurface = math.max(hitbox.Size.X, hitbox.Size.Z) / 2
+	local extraRange = interactionConfig.ExtraRangeFromSurface or 2.5
+	local minRange = interactionConfig.MinRange or 4
+	local maxRange = interactionConfig.MaxRange or 12
+	return math.clamp(halfSurface + extraRange, minRange, maxRange)
 end
 
 local function getWasteModelFromInstance(instance)
@@ -76,7 +101,7 @@ local function getWasteModelFromInstance(instance)
 	return nil
 end
 
-local function isWasteAttackable(wasteModel, root, range)
+local function isWasteAttackable(wasteModel, root)
 	if not wasteModel or not wasteModel.Parent then
 		return false
 	end
@@ -91,12 +116,13 @@ local function isWasteAttackable(wasteModel, root, range)
 		return false
 	end
 
-	return (root.Position - hitbox.Position).Magnitude <= range + math.max(hitbox.Size.X, hitbox.Size.Z) / 2
+	local interactionRadius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(hitbox)
+	return getHorizontalDistance(root.Position, hitbox.Position) <= interactionRadius
 end
 
 local function findNearestWaste()
 	local root = getRootPart()
-	if not root then
+	if not root or not isToolEquipped() then
 		return nil
 	end
 
@@ -105,7 +131,6 @@ local function findNearestWaste()
 		return nil
 	end
 
-	local range = getToolRange()
 	local mousePosition = mouse.Hit and mouse.Hit.Position or root.Position
 	local bestModel = nil
 	local bestScore = math.huge
@@ -113,8 +138,8 @@ local function findNearestWaste()
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
 			local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
-			if hitbox and isWasteAttackable(wasteModel, root, range) then
-				local playerDistance = (root.Position - hitbox.Position).Magnitude
+			if hitbox and isWasteAttackable(wasteModel, root) then
+				local playerDistance = getHorizontalDistance(root.Position, hitbox.Position)
 				local mouseDistance = (mousePosition - hitbox.Position).Magnitude
 				local score = playerDistance + mouseDistance * 0.25
 				if score < bestScore then
@@ -130,13 +155,12 @@ end
 
 local function findTarget()
 	local root = getRootPart()
-	if not root then
+	if not root or not isToolEquipped() then
 		return nil
 	end
 
-	local range = getToolRange()
 	local mouseTargetModel = getWasteModelFromInstance(mouse.Target)
-	if mouseTargetModel and isWasteAttackable(mouseTargetModel, root, range) then
+	if mouseTargetModel and isWasteAttackable(mouseTargetModel, root) then
 		return mouseTargetModel
 	end
 
@@ -158,55 +182,132 @@ local function playTargetFlash(target)
 	Debris:AddItem(highlight, 0.12)
 end
 
-local function playToolSwing()
+local function getAnimationId()
+	local animations = GameData.Animations or {}
+	local animationId = animations.BrushSwing
+	if type(animationId) ~= "string" or animationId == "" or animationId == "0" or animationId == "rbxassetid://0" then
+		return nil
+	end
+
+	return animationId
+end
+
+local function tryPlayRobloxAnimation()
+	local animationId = getAnimationId()
+	if not animationId then
+		return false
+	end
+
 	local character = player.Character
-	local toolConfig = getEquippedToolConfig()
-	if not character or not toolConfig then
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if humanoid and not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid
+	end
+	if not humanoid or not animator then
+		return false
+	end
+
+	local animation = Instance.new("Animation")
+	animation.AnimationId = animationId
+
+	local ok, trackOrError = pcall(function()
+		return animator:LoadAnimation(animation)
+	end)
+
+	if not ok or not trackOrError then
+		warn("[ToolClient] Could not load Brush swing animation. Fallback swing will be used:", trackOrError)
+		animation:Destroy()
+		return false
+	end
+
+	local track = trackOrError
+	track.Priority = Enum.AnimationPriority.Action
+	track:Play(0.04)
+
+	task.delay(1.2, function()
+		if track.IsPlaying then
+			track:Stop(0.08)
+		end
+		track:Destroy()
+		animation:Destroy()
+	end)
+
+	return true
+end
+
+local function playNativeToolEffects(tool)
+	local handle = tool and tool:FindFirstChild("Handle")
+	if not handle then
 		return
 	end
 
-	local visual = character:FindFirstChild("GEIToolVisual")
-	local weld = visual and visual:FindFirstChild("ToolWeld")
-	if not weld or not weld:IsA("Weld") then
+	local particles = handle:FindFirstChild("SwingParticles")
+	if particles and particles:IsA("ParticleEmitter") then
+		particles:Emit(6)
+	end
+
+	local sound = handle:FindFirstChild("HitSound")
+	if sound and sound:IsA("Sound") and sound.SoundId ~= "" and sound.SoundId ~= "rbxassetid://0" then
+		sound:Play()
+	end
+end
+
+local function playFallbackSwing(tool, toolConfig)
+	if not tool or not toolConfig then
 		return
 	end
 
-	if activeSwingTween then
-		activeSwingTween:Cancel()
-		activeSwingTween = nil
+	if activeGripTweens[tool] then
+		activeGripTweens[tool]:Cancel()
+		activeGripTweens[tool] = nil
 	end
 
 	local visualConfig = toolConfig.Visual or {}
-	local baseGrip = visualConfig.GripOffset or weld.C0
+	local baseGrip = visualConfig.GripOffset or tool.Grip
 	local swingOffset = visualConfig.SwingOffset or (CFrame.new(0, -0.1, -0.45) * CFrame.Angles(math.rad(-30), 0, math.rad(-12)))
-	weld.C0 = baseGrip
+	tool.Grip = baseGrip
 
-	local outTween = TweenService:Create(weld, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		C0 = baseGrip * swingOffset,
+	local outTween = TweenService:Create(tool, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Grip = baseGrip * swingOffset,
 	})
-	local inTween = TweenService:Create(weld, TweenInfo.new(0.11, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		C0 = baseGrip,
+	local inTween = TweenService:Create(tool, TweenInfo.new(0.11, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Grip = baseGrip,
 	})
 
-	activeSwingTween = outTween
+	activeGripTweens[tool] = outTween
 	outTween:Play()
 	outTween.Completed:Connect(function()
-		if weld.Parent then
-			activeSwingTween = inTween
+		if tool.Parent then
+			activeGripTweens[tool] = inTween
 			inTween:Play()
 		end
 	end)
 	inTween.Completed:Connect(function()
-		if activeSwingTween == inTween then
-			activeSwingTween = nil
+		if activeGripTweens[tool] == inTween then
+			activeGripTweens[tool] = nil
 		end
 	end)
+end
+
+local function playToolSwing()
+	local tool = getEquippedNativeTool()
+	local toolConfig = getEquippedToolConfig()
+	if not tool or not toolConfig then
+		return
+	end
+
+	playNativeToolEffects(tool)
+	if not tryPlayRobloxAnimation() then
+		playFallbackSwing(tool, toolConfig)
+	end
 end
 
 local function requestAttack()
 	local now = os.clock()
 	local toolConfig = getEquippedToolConfig()
-	if not toolConfig or now < localCooldownUntil then
+	if not toolConfig or not isToolEquipped() or now < localCooldownUntil then
 		return
 	end
 
@@ -221,7 +322,7 @@ local function requestAttack()
 	requestAttackRemote:FireServer(target)
 end
 
-local function equipFirstToolSlot()
+local function toggleFirstToolSlot()
 	local ownedTools = playerData:FindFirstChild("OwnedTools")
 	if not ownedTools then
 		return
@@ -230,7 +331,7 @@ local function equipFirstToolSlot()
 	for _, toolId in ipairs(GameData.ToolOrder) do
 		local ownedValue = ownedTools:FindFirstChild(toolId)
 		if ownedValue and ownedValue:IsA("BoolValue") and ownedValue.Value == true then
-			equipItemRemote:FireServer("Tool", toolId)
+			equipItemRemote:FireServer("Tool", toolId, "Toggle")
 			return
 		end
 	end
@@ -244,7 +345,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		requestAttack()
 	elseif input.KeyCode == Enum.KeyCode.One or input.KeyCode == Enum.KeyCode.KeypadOne then
-		equipFirstToolSlot()
+		toggleFirstToolSlot()
 	end
 end)
 
@@ -263,37 +364,34 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 
-	local range = getToolRange()
 	local timeNow = os.clock()
-	local ringConfig = GameData.InteractionRing
+	local ringConfig = GameData.InteractionCircle
 
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
 			local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
 			local ring = wasteModel:FindFirstChild("RangeRing")
 			if hitbox and ring then
-				local distanceToWaste = (root.Position - hitbox.Position).Magnitude
+				local distanceToWaste = getHorizontalDistance(root.Position, hitbox.Position)
 				local visible = distanceToWaste <= ringConfig.DisplayDistance
-				local radius = math.clamp(wasteModel:GetAttribute("RingRadius") or ringConfig.DefaultRadius, 4, ringConfig.MaxRadius)
-				local inRange = (root.Position - hitbox.Position).Magnitude <= range + math.max(hitbox.Size.X, hitbox.Size.Z) / 2
-				local visualRadius = radius + (inRange and ringConfig.InRangeRadiusBoost or 0)
-				local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + 0.12, hitbox.Position.Z)
+				local radius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(hitbox)
+				local inRange = distanceToWaste <= radius
+				local visualRadius = radius * (inRange and ringConfig.InRangeScale or 1)
+				local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + ringConfig.HeightOffset, hitbox.Position.Z)
 
 				for _, segment in ipairs(ring:GetChildren()) do
 					if segment:IsA("BasePart") then
-						local baseLength = segment:GetAttribute("BaseLength")
-						local baseDepth = segment:GetAttribute("BaseDepth")
-						if not baseLength then
-							baseLength = segment.Size.X
-							baseDepth = segment.Size.Z
-							segment:SetAttribute("BaseLength", baseLength)
-							segment:SetAttribute("BaseDepth", baseDepth)
-						end
-
+						local baseLength = segment:GetAttribute("BaseLength") or segment.Size.X
+						local baseThickness = segment:GetAttribute("BaseThickness") or ringConfig.Thickness
 						local index = segment:GetAttribute("SegmentIndex") or 1
 						local count = segment:GetAttribute("SegmentCount") or ringConfig.SegmentCount
-						local angle = ((index - 1) / count) * math.pi * 2 + timeNow * ringConfig.RotationSpeed
-						segment.Size = Vector3.new(baseLength * (inRange and 1.14 or 1), ringConfig.Height, baseDepth * (inRange and 1.25 or 1))
+						local angle = ((index - 1) / count) * math.pi * 2 + timeNow * math.rad(ringConfig.RotationSpeed)
+
+						segment.Size = Vector3.new(
+							baseLength * (inRange and 1.08 or 1),
+							baseThickness * (inRange and 1.35 or 1),
+							baseThickness * (inRange and 1.35 or 1)
+						)
 						segment.Color = inRange and ringConfig.InRangeColor or ringConfig.Color
 						segment.Transparency = visible and (inRange and ringConfig.InRangeTransparency or ringConfig.IdleTransparency) or 1
 						segment.CFrame = CFrame.new(center + Vector3.new(math.cos(angle) * visualRadius, 0, math.sin(angle) * visualRadius))

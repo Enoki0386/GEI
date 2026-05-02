@@ -1,3 +1,5 @@
+local CollectionService = game:GetService("CollectionService")
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -108,6 +110,29 @@ local function getRootPart(player)
 	end
 
 	return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHorizontalDistance(a, b)
+	return (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
+end
+
+local function calculateInteractionRadius(size)
+	local interactionConfig = GameData.Interaction or {}
+	local halfSurface = math.max(size.X, size.Z) / 2
+	local extraRange = interactionConfig.ExtraRangeFromSurface or 2.5
+	local minRange = interactionConfig.MinRange or 4
+	local maxRange = interactionConfig.MaxRange or 12
+	return math.clamp(halfSurface + extraRange, minRange, maxRange)
+end
+
+local function hasEquippedNativeTool(player, toolId)
+	local character = player.Character
+	if not character then
+		return false
+	end
+
+	local tool = character:FindFirstChild(toolId)
+	return tool ~= nil and tool:IsA("Tool") and tool:GetAttribute("GEINativeTool") == true
 end
 
 local function isFarFromPlayers(position)
@@ -268,17 +293,17 @@ local function updateHPBillboard(wasteModel)
 end
 
 local function createRangeRing(wasteModel, hitbox, wasteConfig)
-	local ringConfig = GameData.InteractionRing
+	local ringConfig = GameData.InteractionCircle
 	local ringFolder = Instance.new("Folder")
 	ringFolder.Name = "RangeRing"
 	ringFolder.Parent = wasteModel
 
-	local radius = math.clamp(wasteConfig.RingRadius or ringConfig.DefaultRadius, 4, ringConfig.MaxRadius)
+	local radius = calculateInteractionRadius(hitbox.Size)
 	local segmentCount = ringConfig.SegmentCount
-	local segmentLength = ringConfig.SegmentLength
-	local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + 0.14, hitbox.Position.Z)
+	local segmentLength = ((math.pi * 2 * radius) / segmentCount) * ringConfig.SegmentLengthRatio
+	local center = Vector3.new(hitbox.Position.X, hitbox.Position.Y - hitbox.Size.Y / 2 + ringConfig.HeightOffset, hitbox.Position.Z)
 
-	wasteModel:SetAttribute("RingRadius", radius)
+	wasteModel:SetAttribute("InteractionRadius", radius)
 	wasteModel:SetAttribute("RingSegmentCount", segmentCount)
 
 	for index = 1, segmentCount do
@@ -291,10 +316,12 @@ local function createRangeRing(wasteModel, hitbox, wasteConfig)
 		segment.CanTouch = false
 		segment.Color = ringConfig.Color or wasteConfig.AccentColor
 		segment.Material = Enum.Material.Neon
-		segment.Size = Vector3.new(segmentLength, ringConfig.Height, ringConfig.Thickness)
+		segment.Size = Vector3.new(segmentLength, ringConfig.Thickness, ringConfig.Thickness)
 		segment.Transparency = ringConfig.IdleTransparency
 		segment:SetAttribute("SegmentIndex", index)
 		segment:SetAttribute("SegmentCount", segmentCount)
+		segment:SetAttribute("BaseLength", segmentLength)
+		segment:SetAttribute("BaseThickness", ringConfig.Thickness)
 		segment.CFrame = CFrame.new(center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius))
 			* CFrame.Angles(0, -angle - math.pi / 2, 0)
 		segment.Parent = ringFolder
@@ -374,6 +401,59 @@ local function playHitFeedback(wasteModel)
 			inTween:Play()
 		end
 	end)
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "WasteHitHighlight"
+	highlight.FillColor = Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 0.58
+	highlight.OutlineColor = Color3.fromRGB(255, 238, 131)
+	highlight.OutlineTransparency = 0.08
+	highlight.Parent = wasteModel
+	Debris:AddItem(highlight, 0.14)
+
+	local particles = Instance.new("ParticleEmitter")
+	particles.Name = "WasteHitParticles"
+	particles.Color = ColorSequence.new(hitbox.Color)
+	particles.Enabled = false
+	particles.LightEmission = 0.35
+	particles.Lifetime = NumberRange.new(0.16, 0.28)
+	particles.Rate = 0
+	particles.Speed = NumberRange.new(4, 8)
+	particles.SpreadAngle = Vector2.new(45, 45)
+	particles.Parent = hitbox
+	particles:Emit(10)
+	Debris:AddItem(particles, 0.5)
+end
+
+local function playDestroyFeedback(wasteModel)
+	local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
+	if not hitbox then
+		return
+	end
+
+	local effectPart = Instance.new("Part")
+	effectPart.Name = "WasteDestroyEffect"
+	effectPart.Anchored = true
+	effectPart.CanCollide = false
+	effectPart.CanQuery = false
+	effectPart.CanTouch = false
+	effectPart.Transparency = 1
+	effectPart.Size = Vector3.new(1, 1, 1)
+	effectPart.CFrame = hitbox.CFrame
+	effectPart.Parent = Workspace
+
+	local burst = Instance.new("ParticleEmitter")
+	burst.Name = "WasteDestroyBurst"
+	burst.Color = ColorSequence.new(hitbox.Color)
+	burst.Enabled = false
+	burst.LightEmission = 0.55
+	burst.Lifetime = NumberRange.new(0.28, 0.45)
+	burst.Rate = 0
+	burst.Speed = NumberRange.new(7, 13)
+	burst.SpreadAngle = Vector2.new(90, 90)
+	burst.Parent = effectPart
+	burst:Emit(24)
+	Debris:AddItem(effectPart, 0.8)
 end
 
 local function createWasteNode(spawnPosition, wasteZone)
@@ -385,11 +465,14 @@ local function createWasteNode(spawnPosition, wasteZone)
 	model.Name = wasteConfig.Name
 	model:SetAttribute("GEIWasteNode", true)
 	model:SetAttribute("WasteId", wasteId)
+	model:SetAttribute("WasteType", wasteId)
 	model:SetAttribute("ModelName", wasteConfig.ModelName or "")
 	model:SetAttribute("Rarity", wasteConfig.Rarity)
 	model:SetAttribute("CurrentHP", wasteConfig.MaxHP)
 	model:SetAttribute("MaxHP", wasteConfig.MaxHP)
 	model:SetAttribute("WasteReward", wasteConfig.WasteReward)
+	model:SetAttribute("RewardWaste", wasteConfig.WasteReward)
+	model:SetAttribute("RewardCash", 0)
 	model:SetAttribute("DiamondChance", wasteConfig.DiamondChance)
 	model:SetAttribute("DiamondReward", wasteConfig.DiamondReward)
 
@@ -412,6 +495,7 @@ local function createWasteNode(spawnPosition, wasteZone)
 	createBillboard(hitbox, wasteConfig)
 	createRangeRing(model, hitbox, wasteConfig)
 	model.Parent = wasteZone
+	CollectionService:AddTag(model, "WasteNode")
 end
 
 local function getWasteModelFromTarget(target)
@@ -451,12 +535,20 @@ local function handleAttack(player, target)
 	end
 
 	local equippedTool = dataFolder:FindFirstChild("EquippedTool")
+	local isToolEquipped = dataFolder:FindFirstChild("IsToolEquipped")
 	local wasteCount = dataFolder:FindFirstChild("WasteCount")
 	local maxWaste = dataFolder:FindFirstChild("MaxWaste")
 	local toolDamage = dataFolder:FindFirstChild("ToolDamage")
-	local toolRange = dataFolder:FindFirstChild("ToolRange")
 
-	if not equippedTool or not wasteCount or not maxWaste or not toolDamage or not toolRange then
+	if not equippedTool or not isToolEquipped or not wasteCount or not maxWaste or not toolDamage then
+		return
+	end
+
+	if isToolEquipped.Value ~= true or not hasEquippedNativeTool(player, equippedTool.Value) then
+		fireClient(player, "AttackFeedback", {
+			Target = wasteModel,
+			Reason = "ToolUnequipped",
+		})
 		return
 	end
 
@@ -479,9 +571,9 @@ local function handleAttack(player, target)
 		return
 	end
 
-	local distance = (root.Position - hitbox.Position).Magnitude
-	local allowedDistance = toolRange.Value + math.max(hitbox.Size.X, hitbox.Size.Z) / 2
-	if distance > allowedDistance then
+	local interactionRadius = wasteModel:GetAttribute("InteractionRadius") or calculateInteractionRadius(hitbox.Size)
+	local distance = getHorizontalDistance(root.Position, hitbox.Position)
+	if distance > interactionRadius then
 		fireClient(player, "AttackFeedback", {
 			Target = wasteModel,
 			Reason = "OutOfRange",
@@ -509,12 +601,14 @@ local function handleAttack(player, target)
 
 	if newHP <= 0 then
 		feedback.Destroyed = true
-		feedback.WasteGained = PlayerManager.AddWaste(player, wasteModel:GetAttribute("WasteReward") or 0)
+		feedback.WasteGained = PlayerManager.AddWaste(player, wasteModel:GetAttribute("RewardWaste") or wasteModel:GetAttribute("WasteReward") or 0)
 
 		local diamondChance = wasteModel:GetAttribute("DiamondChance") or 0
 		if random:NextNumber() <= diamondChance then
 			feedback.DiamondsGained = PlayerManager.AddDiamonds(player, wasteModel:GetAttribute("DiamondReward") or 1)
 		end
+
+		playDestroyFeedback(wasteModel)
 
 		task.delay(0.18, function()
 			if wasteModel.Parent then

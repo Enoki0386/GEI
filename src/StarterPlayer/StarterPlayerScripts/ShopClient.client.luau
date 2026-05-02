@@ -65,6 +65,11 @@ end
 local function isEquipped(category, itemId)
 	local valueName = category == "Tool" and "EquippedTool" or "EquippedBackpack"
 	local equipped = playerData:FindFirstChild(valueName)
+	if category == "Tool" then
+		local isToolEquipped = playerData:FindFirstChild("IsToolEquipped")
+		return equipped ~= nil and equipped.Value == itemId and isToolEquipped ~= nil and isToolEquipped.Value == true
+	end
+
 	return equipped ~= nil and equipped.Value == itemId
 end
 
@@ -661,6 +666,8 @@ if purchaseResultRemote then
 				showNotification("Bought " .. itemName, Color3.fromRGB(136, 255, 164))
 			elseif reason == "Equipped" then
 				showNotification("Equipped " .. itemName, Color3.fromRGB(179, 212, 255))
+			elseif reason == "Unequipped" then
+				showNotification("Unequipped " .. itemName, Color3.fromRGB(207, 218, 222))
 			else
 				showNotification("Updated " .. itemName, Color3.fromRGB(220, 235, 255))
 			end

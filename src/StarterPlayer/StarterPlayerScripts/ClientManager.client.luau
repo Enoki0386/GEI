@@ -1,8 +1,13 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
+pcall(function()
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+end)
+
 local gameDataModule = ReplicatedStorage:WaitForChild("GameData", 10)
 if not gameDataModule then
 	warn("[GEI] GameData is missing. ClientManager stopped.")
@@ -242,6 +247,8 @@ local function refreshToolbar()
 	local ownedTools = getOwnedTools()
 	local equippedToolValue = playerData:FindFirstChild("EquippedTool")
 	local equippedTool = equippedToolValue and equippedToolValue.Value or "Brush"
+	local isToolEquippedValue = playerData:FindFirstChild("IsToolEquipped")
+	local isToolEquipped = isToolEquippedValue and isToolEquippedValue.Value == true
 	local slotCount = math.max(1, #ownedTools)
 	toolbar.Size = UDim2.fromOffset(math.max(112, slotCount * 90 + 20), 88)
 
@@ -255,7 +262,7 @@ local function refreshToolbar()
 
 	for index, toolId in ipairs(ownedTools) do
 		local toolConfig = GameData.GetTool(toolId)
-		local selected = toolId == equippedTool
+		local selected = toolId == equippedTool and isToolEquipped
 		local slot = new("Frame", {
 			Name = toolId .. "Slot",
 			BackgroundTransparency = 1,
@@ -313,7 +320,7 @@ local function refreshToolbar()
 
 		button.Activated:Connect(function()
 			if equipItemRemote then
-				equipItemRemote:FireServer("Tool", toolId)
+				equipItemRemote:FireServer("Tool", toolId, "Toggle")
 			end
 		end)
 	end
@@ -389,6 +396,8 @@ if attackFeedbackRemote then
 
 		if feedback.Reason == "BackpackFull" then
 			showFloating("Backpack full", Color3.fromRGB(255, 210, 101))
+		elseif feedback.Reason == "ToolUnequipped" then
+			showFloating("Equip your tool", Color3.fromRGB(179, 212, 255))
 		elseif feedback.WasteGained and feedback.WasteGained > 0 then
 			local text = "+" .. formatNumber(feedback.WasteGained) .. " Waste"
 			if feedback.DiamondsGained and feedback.DiamondsGained > 0 then

@@ -93,7 +93,7 @@ ensureRemote("BuyItem").OnServerEvent:Connect(function(player, category, itemId)
 	ensureRemote("PurchaseResult"):FireClient(player, ok, reason, category, itemId)
 end)
 
-ensureRemote("EquipItem").OnServerEvent:Connect(function(player, category, itemId)
+ensureRemote("EquipItem").OnServerEvent:Connect(function(player, category, itemId, mode)
 	if type(category) ~= "string" or type(itemId) ~= "string" then
 		warn("[ShopManager] Ignored invalid EquipItem request from", player.Name)
 		return
@@ -108,13 +108,20 @@ ensureRemote("EquipItem").OnServerEvent:Connect(function(player, category, itemI
 
 	local PlayerManager = waitForPlayerManager()
 	local ok = false
+	local reason = "CannotEquip"
 	if category == "Tool" then
-		ok = PlayerManager.EquipTool(player, itemId)
+		if mode == "Toggle" then
+			ok, reason = PlayerManager.ToggleTool(player, itemId)
+		else
+			ok = PlayerManager.EquipTool(player, itemId)
+			reason = ok and "Equipped" or "CannotEquip"
+		end
 	elseif category == "Backpack" then
 		ok = PlayerManager.EquipBackpack(player, itemId)
+		reason = ok and "Equipped" or "CannotEquip"
 	end
 
-	ensureRemote("PurchaseResult"):FireClient(player, ok, ok and "Equipped" or "CannotEquip", category, itemId)
+	ensureRemote("PurchaseResult"):FireClient(player, ok, reason, category, itemId)
 end)
 
 task.spawn(function()

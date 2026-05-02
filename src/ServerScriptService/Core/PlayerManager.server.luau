@@ -78,8 +78,39 @@ local function copySet(source)
 	return result
 end
 
+local function getDebugConfig()
+	local debugConfig = GameData.Debug
+	if type(debugConfig) == "table" and debugConfig.Enabled == true then
+		return debugConfig
+	end
+
+	return nil
+end
+
+local function applyDebugOverrides(saveData)
+	local debugConfig = getDebugConfig()
+	if not debugConfig then
+		return saveData
+	end
+
+	saveData.Cash = math.max(0, math.floor(debugConfig.StartingCash or saveData.Cash or 0))
+	saveData.Diamonds = math.max(0, math.floor(debugConfig.StartingDiamonds or saveData.Diamonds or 0))
+	saveData.WasteCount = math.max(0, math.floor(debugConfig.StartingWaste or saveData.WasteCount or 0))
+	return saveData
+end
+
+local function getToolDamage(tool)
+	local multiplier = 1
+	local debugConfig = getDebugConfig()
+	if debugConfig and type(debugConfig.ToolDamageMultiplier) == "number" then
+		multiplier = math.max(0, debugConfig.ToolDamageMultiplier)
+	end
+
+	return math.max(0, math.floor((tool.Damage or 0) * multiplier))
+end
+
 local function createDefaultSaveData()
-	return {
+	return applyDebugOverrides({
 		Cash = GameData.Economy.StartingCash,
 		Diamonds = GameData.Economy.StartingDiamonds,
 		WasteCount = 0,
@@ -91,7 +122,7 @@ local function createDefaultSaveData()
 		OwnedBackpacks = {
 			SmallBag = true,
 		},
-	}
+	})
 end
 
 local function mergeSaveData(savedData)
@@ -137,7 +168,7 @@ local function mergeSaveData(savedData)
 		data.EquippedBackpack = "SmallBag"
 	end
 
-	return data
+	return applyDebugOverrides(data)
 end
 
 local function loadSaveData(player)
@@ -219,7 +250,7 @@ local function updateDerivedStats(player)
 	local tool = equippedTool and GameData.GetTool(equippedTool.Value) or GameData.GetTool("Brush")
 	local backpack = equippedBackpack and GameData.GetBackpack(equippedBackpack.Value) or GameData.GetBackpack("SmallBag")
 
-	createValue("NumberValue", "ToolDamage", tool.Damage, dataFolder)
+	createValue("NumberValue", "ToolDamage", getToolDamage(tool), dataFolder)
 	createValue("NumberValue", "ToolRange", tool.Range, dataFolder)
 	createValue("IntValue", "MaxWaste", backpack.Capacity, dataFolder)
 
@@ -263,6 +294,7 @@ local function snapshotPlayerData(player)
 		WasteCount = dataFolder.WasteCount.Value,
 		MaxWaste = dataFolder.MaxWaste.Value,
 		EquippedTool = dataFolder.EquippedTool.Value,
+		IsToolEquipped = dataFolder.IsToolEquipped.Value,
 		EquippedBackpack = dataFolder.EquippedBackpack.Value,
 		ToolDamage = dataFolder.ToolDamage.Value,
 		ToolRange = dataFolder.ToolRange.Value,
@@ -336,8 +368,9 @@ local function setupPlayer(player)
 	createValue("IntValue", "WasteCount", math.min(saveData.WasteCount, backpack.Capacity), dataFolder)
 	createValue("IntValue", "MaxWaste", backpack.Capacity, dataFolder)
 	createValue("StringValue", "EquippedTool", tool.Id, dataFolder)
+	createValue("BoolValue", "IsToolEquipped", false, dataFolder)
 	createValue("StringValue", "EquippedBackpack", backpack.Id, dataFolder)
-	createValue("NumberValue", "ToolDamage", tool.Damage, dataFolder)
+	createValue("NumberValue", "ToolDamage", getToolDamage(tool), dataFolder)
 	createValue("NumberValue", "ToolRange", tool.Range, dataFolder)
 
 	createOwnedFolder("OwnedTools", saveData.OwnedTools, dataFolder)
@@ -352,6 +385,9 @@ local function setupPlayer(player)
 	end
 
 	pushPlayerData(player)
+	if _G.GEI.ToolVisualManager and _G.GEI.ToolVisualManager.SyncInventory then
+		task.defer(_G.GEI.ToolVisualManager.SyncInventory, player)
+	end
 end
 
 local PlayerManager = {}
@@ -407,13 +443,60 @@ function PlayerManager.EquipTool(player, toolId)
 
 	dataFolder.EquippedTool.Value = tool.Id
 	updateDerivedStats(player)
-	pushPlayerData(player)
 
-	if _G.GEI.ToolVisualManager and _G.GEI.ToolVisualManager.Attach then
-		task.defer(_G.GEI.ToolVisualManager.Attach, player)
+	if _G.GEI.ToolVisualManager and _G.GEI.ToolVisualManager.SyncInventory then
+		_G.GEI.ToolVisualManager.SyncInventory(player)
 	end
 
+	local nativeEquipped = false
+	if _G.GEI.ToolVisualManager and _G.GEI.ToolVisualManager.Equip then
+		nativeEquipped = _G.GEI.ToolVisualManager.Equip(player, tool.Id) == true
+	end
+
+	local isToolEquipped = dataFolder:FindFirstChild("IsToolEquipped")
+	if isToolEquipped and isToolEquipped:IsA("BoolValue") then
+		isToolEquipped.Value = nativeEquipped
+	end
+
+	pushPlayerData(player)
+
+	return nativeEquipped
+end
+
+function PlayerManager.UnequipTool(player)
+	local dataFolder = getPlayerDataFolder(player)
+	if not dataFolder then
+		return false
+	end
+
+	if _G.GEI.ToolVisualManager and _G.GEI.ToolVisualManager.Unequip then
+		_G.GEI.ToolVisualManager.Unequip(player)
+	end
+
+	local isToolEquipped = dataFolder:FindFirstChild("IsToolEquipped")
+	if isToolEquipped and isToolEquipped:IsA("BoolValue") then
+		isToolEquipped.Value = false
+	end
+
+	pushPlayerData(player)
 	return true
+end
+
+function PlayerManager.ToggleTool(player, toolId)
+	local dataFolder = getPlayerDataFolder(player)
+	if not dataFolder then
+		return false, "DataMissing"
+	end
+
+	local equippedTool = dataFolder:FindFirstChild("EquippedTool")
+	local isToolEquipped = dataFolder:FindFirstChild("IsToolEquipped")
+	if equippedTool and isToolEquipped and equippedTool.Value == toolId and isToolEquipped.Value == true then
+		PlayerManager.UnequipTool(player)
+		return true, "Unequipped"
+	end
+
+	local equipped = PlayerManager.EquipTool(player, toolId)
+	return equipped, equipped and "Equipped" or "CannotEquip"
 end
 
 function PlayerManager.EquipBackpack(player, backpackId)
@@ -455,8 +538,8 @@ function PlayerManager.BuyItem(player, category, itemId)
 			return false, "UnknownTool"
 		end
 		if PlayerManager.HasTool(player, itemId) then
-			PlayerManager.EquipTool(player, itemId)
-			return true, "Equipped"
+			local equipped = PlayerManager.EquipTool(player, itemId)
+			return equipped, equipped and "Equipped" or "CannotEquip"
 		end
 		if leaderstats.Cash.Value < tool.Price then
 			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: NotEnoughCash")
@@ -481,8 +564,8 @@ function PlayerManager.BuyItem(player, category, itemId)
 			return false, "UnknownBackpack"
 		end
 		if PlayerManager.HasBackpack(player, itemId) then
-			PlayerManager.EquipBackpack(player, itemId)
-			return true, "Equipped"
+			local equipped = PlayerManager.EquipBackpack(player, itemId)
+			return equipped, equipped and "Equipped" or "CannotEquip"
 		end
 		if leaderstats.Cash.Value < backpack.Price then
 			warn("[ShopManager] Purchase failed for", player.Name, itemId, "reason: NotEnoughCash")

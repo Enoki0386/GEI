@@ -2,6 +2,15 @@ local GameData = {}
 
 -- CONFIGURATION FACILE À MODIFIER
 
+-- DEBUG MODE: mettre Enabled = false avant publication
+GameData.Debug = {
+	Enabled = true,
+	StartingCash = 5000,
+	StartingDiamonds = 500,
+	StartingWaste = 0,
+	ToolDamageMultiplier = 1,
+}
+
 GameData.Spawn = {
 	SurfaceName = "SpawnSurface1",
 	WasteZoneName = "WasteZone",
@@ -21,20 +30,28 @@ GameData.WasteDisplay = {
 	HitTweenTime = 0.08,
 }
 
-GameData.InteractionRing = {
-	SegmentCount = 36,
-	DefaultRadius = 8,
-	MaxRadius = 15,
-	SegmentLength = 1.25,
-	Thickness = 0.18,
-	Height = 0.06,
-	RotationSpeed = 0.55,
-	DisplayDistance = 70,
+GameData.Interaction = {
+	ExtraRangeFromSurface = 2.5,
+	MinRange = 4,
+	MaxRange = 12,
+}
+
+GameData.InteractionCircle = {
+	SegmentCount = 24,
+	SegmentLengthRatio = 0.55,
+	Thickness = 0.08,
+	HeightOffset = 0.08,
+	RotationSpeed = 25,
+	InRangeScale = 1.08,
+	DisplayDistance = 60,
 	IdleTransparency = 0.45,
 	InRangeTransparency = 0.1,
-	InRangeRadiusBoost = 0.4,
 	Color = Color3.fromRGB(255, 238, 131),
 	InRangeColor = Color3.fromRGB(125, 255, 159),
+}
+
+GameData.Animations = {
+	BrushSwing = "rbxassetid://0", -- à remplacer plus tard
 }
 
 GameData.Economy = {
@@ -181,7 +198,6 @@ GameData.WasteTypes = {
 		DiamondReward = 1,
 		Color = Color3.fromRGB(112, 156, 85),
 		AccentColor = Color3.fromRGB(184, 229, 112),
-		RingRadius = 7,
 		VisualSize = Vector3.new(4, 2.4, 4),
 		ModelName = nil,
 	},
@@ -196,7 +212,6 @@ GameData.WasteTypes = {
 		DiamondReward = 1,
 		Color = Color3.fromRGB(77, 142, 210),
 		AccentColor = Color3.fromRGB(136, 205, 255),
-		RingRadius = 9,
 		VisualSize = Vector3.new(5, 3, 5),
 		ModelName = nil,
 	},
@@ -211,7 +226,6 @@ GameData.WasteTypes = {
 		DiamondReward = 3,
 		Color = Color3.fromRGB(145, 86, 211),
 		AccentColor = Color3.fromRGB(222, 171, 255),
-		RingRadius = 11,
 		VisualSize = Vector3.new(6, 3.6, 6),
 		ModelName = nil,
 	},

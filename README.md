@@ -27,7 +27,8 @@ src/
 |   |-- GameData.luau
 |   |-- Remotes/
 |   |-- Shared/
-|   `-- Tools/
+|   |-- Tools/
+|   `-- WasteModels/
 |-- ServerScriptService/
 |   |-- Core/
 |   |   |-- MapValidator.server.luau
@@ -156,7 +157,7 @@ The game should not crash if the map is incomplete. The related system simply wa
 - `ShopManager.server.luau` uses `Workspace.BuyZone`.
 - `SpawnManager.server.luau` checks for `Workspace.SpawnSurface1`.
 - `MapValidator.server.luau` validates all required manual objects.
-- `ToolVisualManager.server.luau` creates a simple visible tool on the player's hand.
+- `ToolVisualManager.server.luau` creates native Roblox `Tool` instances with `Handle` parts in `ReplicatedStorage.Tools`, then clones owned tools into the player's Backpack.
 
 No script should generate a lobby, decorative platforms, borders, full map, or visual decorations. Create visual map elements manually in Roblox Studio.
 
@@ -192,19 +193,50 @@ You can modify:
 - backpack capacity: `GameData.Backpacks`
 - recommended manual map positions and sizes: `GameData.World`
 - Billboard display distance and HP bar style: `GameData.WasteDisplay`
-- dotted interaction circle settings: `GameData.InteractionRing`
+- debug test values: `GameData.Debug`
+- real attack radius formula: `GameData.Interaction`
+- dotted interaction circle settings: `GameData.InteractionCircle`
+- Roblox animation ids: `GameData.Animations`
 - future assistant / worker placeholder config: `GameData.FutureUnits`
 
 ## Where To Edit Values
 
-- `src/ReplicatedStorage/GameData.luau`: main gameplay config, tools, backpacks, Waste types, HP, rewards, prices, spawn rate, billboard distance, ring settings, future unit placeholders, and recommended manual map sizes.
-- `src/ServerScriptService/Systems/WasteNodeManager.server.luau`: Waste spawning, HP billboard creation, HP bar updates, fallback Waste visuals, future model spawning hook, hit feedback, and ring part creation.
+- `src/ReplicatedStorage/GameData.luau`: main gameplay config, debug mode, tools, backpacks, Waste types, HP, rewards, prices, spawn rate, billboard distance, interaction radius, ring settings, animation ids, future unit placeholders, and recommended manual map sizes.
+- `src/ServerScriptService/Systems/WasteNodeManager.server.luau`: Waste spawning, HP billboard creation, HP bar updates, fallback Waste visuals, future model spawning hook, hit feedback, Waste Attributes/tags, interaction radius validation, and ring part creation.
 - `src/ServerScriptService/Systems/ShopManager.server.luau`: server-side shop remotes and purchase/equip request handling.
-- `src/ServerScriptService/Core/PlayerManager.server.luau`: Cash, Diamonds, owned tools, owned backpacks, DataStore fallback, purchases, equips, and leaderstats.
-- `src/ServerScriptService/Systems/ToolVisualManager.server.luau`: simple visible tool model attached to the player's hand.
+- `src/ServerScriptService/Core/PlayerManager.server.luau`: Cash, Diamonds, owned tools, owned backpacks, debug starting values, DataStore fallback, purchases, equips, and leaderstats.
+- `src/ServerScriptService/Systems/ToolVisualManager.server.luau`: native Roblox Tool templates, Handles, WeldConstraints, Backpack cloning, and server equip/unequip helpers.
 - `src/StarterPlayer/StarterPlayerScripts/ShopClient.client.luau`: Shop UI layout, item grid, detail panel, and purchase notifications.
 - `src/StarterPlayer/StarterPlayerScripts/ClientManager.client.luau`: top resources HUD, bottom custom toolbar, and center floating rewards.
-- `src/StarterPlayer/StarterPlayerScripts/ToolClient.client.luau`: click targeting, key `1` equip, client attack requests, tool swing feedback, and animated interaction rings.
+- `src/StarterPlayer/StarterPlayerScripts/ToolClient.client.luau`: click targeting, key `1` toggle equip, client attack requests, Roblox animation/fallback swing feedback, and animated interaction rings.
+
+## Debug and balancing
+
+Fast testing is controlled in `src/ReplicatedStorage/GameData.luau`:
+
+- Starting Cash: `GameData.Debug.StartingCash`
+- Starting Diamonds: `GameData.Debug.StartingDiamonds`
+- Starting Waste: `GameData.Debug.StartingWaste`
+- Tool damage multiplier: `GameData.Debug.ToolDamageMultiplier`
+- Brush damage/cooldown/display range stat: `GameData.Tools.Brush`
+- Waste HP/rewards/rarity chances: `GameData.WasteTypes`
+- Shop prices: `GameData.Tools` and `GameData.Backpacks`
+- Spawn rate: `GameData.Spawn.SpawnInterval`
+- Max active Waste: `GameData.Spawn.MaxWasteNodes`
+- Real attack radius formula: `GameData.Interaction`
+- Circle visuals: `GameData.InteractionCircle`
+
+Set `GameData.Debug.Enabled = false` before publication. While it is `true`, player sessions start with the debug Cash/Diamonds/Waste values so you can test the Shop quickly.
+
+Attack range currently comes from each Waste Node's `InteractionRadius` Attribute. The server and circle visual both use:
+
+```lua
+max(WasteSize.X, WasteSize.Z) / 2 + GameData.Interaction.ExtraRangeFromSurface
+```
+
+The result is clamped between `GameData.Interaction.MinRange` and `GameData.Interaction.MaxRange`. If the player is outside the circle, the server rejects the attack.
+
+`PlayerData.ToolRange` is still kept for UI/future balancing, but it does not allow attacks beyond the Waste circle.
 
 ## Adding A Tool
 
@@ -232,6 +264,33 @@ SuperBrush = {
 
 The Shop and custom toolbar update from this config.
 
+`ToolVisualManager.server.luau` creates a native fallback `Tool` if `ReplicatedStorage.Tools.SuperBrush` does not exist. Later, you can replace the fallback by creating your own Roblox `Tool` under `ReplicatedStorage.Tools` with:
+
+- a `Tool` named exactly `SuperBrush`
+- a `Handle` part
+- optional extra parts welded to `Handle` with `WeldConstraint`
+- optional `Sound`, `ParticleEmitter`, `Animation`, or other native Roblox effects
+
+Keep the Tool name matching the id in `GameData.Tools`.
+
+## How to add a real Brush swing animation
+
+1. Open Roblox Studio.
+2. Go to Avatar -> Animation Editor.
+3. Create or insert an R15 rig.
+4. Create a simple arm swing animation for the Brush.
+5. Publish the animation.
+6. Copy the AnimationId.
+7. Paste it in `src/ReplicatedStorage/GameData.luau`:
+
+```lua
+GameData.Animations = {
+	BrushSwing = "rbxassetid://TON_ID",
+}
+```
+
+If the id stays `rbxassetid://0`, the client uses a safe fallback swing by tweening the native Tool grip and emitting light tool effects.
+
 ## Adding A Backpack
 
 1. Add an id in `GameData.BackpackOrder`.
@@ -253,13 +312,12 @@ Important fields:
 - `DiamondChance`
 - `DiamondReward`
 - `RarityWeight`
-- `RingRadius`
 - `VisualSize`
 - `ModelName`
 
-The spawn system chooses Waste types by rarity weight.
+The spawn system chooses Waste types by rarity weight. Each spawned Waste gets Attributes for `WasteType`, `Rarity`, `MaxHP`, `CurrentHP`, `RewardWaste`, `RewardCash`, `DiamondChance`, and `InteractionRadius`, plus the `WasteNode` CollectionService tag.
 
-To use custom Waste models later, create a `WasteModels` folder in `ReplicatedStorage`, add your models there, then set `ModelName` on the matching Waste type in `GameData.WasteTypes`. If `ModelName` is empty or missing, the system uses the current simple fallback shape.
+To use custom Waste models later, add your models in `ReplicatedStorage.WasteModels`, then set `ModelName` on the matching Waste type in `GameData.WasteTypes`. If `ModelName` is empty or missing, the system uses the current simple fallback shape.
 
 ## DataStore In Studio
 
@@ -267,7 +325,7 @@ To use custom Waste models later, create a `WasteModels` folder in `ReplicatedSt
 
 ## Technical Rules
 
-- The server validates attacks: distance, equipped tool, cooldown, valid target, and backpack capacity.
+- The server validates attacks: interaction circle distance, active native equipped Tool, cooldown, valid target, and backpack capacity.
 - `FireServer` is used only in LocalScripts.
 - Selling is handled server-side by `SellZoneManager.server.luau`.
 - Cash, Diamonds, purchases, and damage are server authoritative.
