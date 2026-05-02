@@ -30,10 +30,7 @@
 
     "Workspace": {
       "$className": "Workspace",
-      "$ignoreUnknownInstances": true,
-      "Map": {
-        "$path": "src/Workspace/Map"
-      }
+      "$ignoreUnknownInstances": true
     }
   }
 }

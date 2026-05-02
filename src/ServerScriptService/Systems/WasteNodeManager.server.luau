@@ -11,6 +11,16 @@ end
 local GameData = require(gameDataModule)
 local random = Random.new()
 local attackCooldowns = {}
+local shownWarnings = {}
+
+local function warnOnce(key, message)
+	if shownWarnings[key] then
+		return
+	end
+
+	shownWarnings[key] = true
+	warn(message)
+end
 
 local function waitForPlayerManager()
 	local startTime = os.clock()
@@ -45,13 +55,23 @@ end
 
 local function getWasteZone()
 	local wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
-	if not wasteZone then
-		wasteZone = Instance.new("Folder")
-		wasteZone.Name = GameData.Spawn.WasteZoneName
-		wasteZone.Parent = Workspace
+	if wasteZone and wasteZone:IsA("Folder") then
+		return wasteZone
 	end
 
-	return wasteZone
+	if wasteZone then
+		warnOnce(
+			"WasteZoneWrongType",
+			"[WasteNodeManager] Workspace.WasteZone exists but must be a Folder. Replace it manually in Roblox Studio."
+		)
+	else
+		warnOnce(
+			"WasteZoneMissing",
+			"[WasteNodeManager] Missing Workspace.WasteZone. Create a Folder named WasteZone in Workspace."
+		)
+	end
+
+	return nil
 end
 
 local function getSpawnSurface()
@@ -60,16 +80,19 @@ local function getSpawnSurface()
 		return surface
 	end
 
-	surface = Instance.new("Part")
-	surface.Name = GameData.Spawn.SurfaceName
-	surface.Anchored = true
-	surface.CanCollide = true
-	surface.Color = GameData.World.SpawnSurface.Color
-	surface.Material = Enum.Material.Grass
-	surface.Position = GameData.World.SpawnSurface.Position
-	surface.Size = GameData.World.SpawnSurface.Size
-	surface.Parent = Workspace
-	return surface
+	if surface then
+		warnOnce(
+			"SpawnSurfaceWrongType",
+			"[WasteNodeManager] Workspace.SpawnSurface1 exists but must be a Part/BasePart. Replace it manually in Roblox Studio."
+		)
+	else
+		warnOnce(
+			"SpawnSurfaceMissing",
+			"[WasteNodeManager] Missing Workspace.SpawnSurface1. Create a Part named SpawnSurface1. Recommended size: 80, 1, 60."
+		)
+	end
+
+	return nil
 end
 
 local function fireClient(player, remoteName, ...)
@@ -97,8 +120,7 @@ local function isFarFromPlayers(position)
 	return true
 end
 
-local function isFarFromWaste(position)
-	local wasteZone = getWasteZone()
+local function isFarFromWaste(position, wasteZone)
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
 			local hitbox = wasteModel.PrimaryPart or wasteModel:FindFirstChild("Hitbox")
@@ -111,9 +133,8 @@ local function isFarFromWaste(position)
 	return true
 end
 
-local function countActiveWaste()
+local function countActiveWaste(wasteZone)
 	local count = 0
-	local wasteZone = getWasteZone()
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
 			count += 1
@@ -123,7 +144,7 @@ local function countActiveWaste()
 	return count
 end
 
-local function findSpawnPosition(surface)
+local function findSpawnPosition(surface, wasteZone)
 	local margin = 6
 	local halfX = math.max(1, surface.Size.X / 2 - margin)
 	local halfZ = math.max(1, surface.Size.Z / 2 - margin)
@@ -136,7 +157,7 @@ local function findSpawnPosition(surface)
 			surface.Position.Z + random:NextNumber(-halfZ, halfZ)
 		)
 
-		if isFarFromPlayers(position) and isFarFromWaste(position) then
+		if isFarFromPlayers(position) and isFarFromWaste(position, wasteZone) then
 			return position
 		end
 	end
@@ -248,7 +269,7 @@ local function createRangeRing(wasteModel, hitbox, wasteConfig)
 	end
 end
 
-local function createWasteNode(spawnPosition)
+local function createWasteNode(spawnPosition, wasteZone)
 	local wasteId, wasteConfig = GameData.GetRandomWasteType(random)
 	local size = wasteConfig.VisualSize
 	local hitboxPosition = spawnPosition + Vector3.new(0, size.Y / 2, 0)
@@ -291,7 +312,7 @@ local function createWasteNode(spawnPosition)
 	model.PrimaryPart = hitbox
 	createBillboard(hitbox, wasteConfig)
 	createRangeRing(model, hitbox, wasteConfig)
-	model.Parent = getWasteZone()
+	model.Parent = wasteZone
 end
 
 local function getWasteModelFromTarget(target)
@@ -414,16 +435,20 @@ end)
 task.spawn(function()
 	while true do
 		local surface = getSpawnSurface()
-		local activeWaste = countActiveWaste()
+		local wasteZone = getWasteZone()
 
-		while activeWaste < GameData.Spawn.MaxWasteNodes do
-			local spawnPosition = findSpawnPosition(surface)
-			if not spawnPosition then
-				break
+		if surface and wasteZone then
+			local activeWaste = countActiveWaste(wasteZone)
+
+			while activeWaste < GameData.Spawn.MaxWasteNodes do
+				local spawnPosition = findSpawnPosition(surface, wasteZone)
+				if not spawnPosition then
+					break
+				end
+
+				createWasteNode(spawnPosition, wasteZone)
+				activeWaste += 1
 			end
-
-			createWasteNode(spawnPosition)
-			activeWaste += 1
 		end
 
 		task.wait(GameData.Spawn.SpawnInterval)

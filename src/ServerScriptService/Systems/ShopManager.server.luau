@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local playersInside = {}
+local zoneWarningShown = false
 
 local function waitForPlayerManager()
 	while not (_G.GEI and _G.GEI.PlayerManager) do
@@ -34,6 +35,15 @@ local function getZone()
 	local zone = Workspace:FindFirstChild("BuyZone")
 	if zone and zone:IsA("BasePart") then
 		return zone
+	end
+
+	if not zoneWarningShown then
+		if zone then
+			warn("[ShopManager] Workspace.BuyZone exists but must be a Part/BasePart. Shop zone entry is disabled until this is fixed.")
+		else
+			warn("[ShopManager] Missing Workspace.BuyZone. Create a Part named BuyZone. Recommended size: 20, 1, 16.")
+		end
+		zoneWarningShown = true
 	end
 
 	return nil
@@ -85,6 +95,7 @@ task.spawn(function()
 	while true do
 		local zone = getZone()
 		if zone then
+			zoneWarningShown = false
 			for _, player in ipairs(Players:GetPlayers()) do
 				local root = getRootPart(player)
 				local inside = root ~= nil and isPointInsideZone(zone, root.Position)
@@ -97,6 +108,11 @@ task.spawn(function()
 					playersInside[player] = nil
 					ensureRemote("ShopState"):FireClient(player, false)
 				end
+			end
+		else
+			for player in pairs(playersInside) do
+				playersInside[player] = nil
+				ensureRemote("ShopState"):FireClient(player, false)
 			end
 		end
 

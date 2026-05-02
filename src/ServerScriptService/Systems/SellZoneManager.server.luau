@@ -11,6 +11,7 @@ end
 local GameData = require(gameDataModule)
 local playersInside = {}
 local lastSellTimes = {}
+local zoneWarningShown = false
 
 local function waitForPlayerManager()
 	while not (_G.GEI and _G.GEI.PlayerManager) do
@@ -42,6 +43,15 @@ local function getZone()
 	local zone = Workspace:FindFirstChild("SellZone")
 	if zone and zone:IsA("BasePart") then
 		return zone
+	end
+
+	if not zoneWarningShown then
+		if zone then
+			warn("[SellZoneManager] Workspace.SellZone exists but must be a Part/BasePart. Selling is disabled until this is fixed.")
+		else
+			warn("[SellZoneManager] Missing Workspace.SellZone. Create a Part named SellZone. Recommended size: 20, 1, 16.")
+		end
+		zoneWarningShown = true
 	end
 
 	return nil
@@ -83,6 +93,7 @@ task.spawn(function()
 	while true do
 		local zone = getZone()
 		if zone then
+			zoneWarningShown = false
 			for _, player in ipairs(Players:GetPlayers()) do
 				local root = getRootPart(player)
 				local inside = root ~= nil and isPointInsideZone(zone, root.Position)
@@ -95,6 +106,10 @@ task.spawn(function()
 				elseif inside then
 					sellForPlayer(player)
 				end
+			end
+		else
+			for player in pairs(playersInside) do
+				playersInside[player] = nil
 			end
 		end
 

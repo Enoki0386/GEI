@@ -9,31 +9,34 @@ end
 
 local GameData = require(gameDataModule)
 
-local function ensureFolder(name)
-	local existing = Workspace:FindFirstChild(name)
-	if existing and existing:IsA("Folder") then
-		return existing
+local function waitForRequiredPart(name, recommendedSize)
+	local warned = false
+
+	while true do
+		local part = Workspace:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			return part
+		end
+
+		if not warned then
+			warn(
+				"[SpawnManager] Missing Workspace."
+					.. name
+					.. ". Create this Part manually in Roblox Studio. Recommended size: "
+					.. tostring(recommendedSize.X)
+					.. ", "
+					.. tostring(recommendedSize.Y)
+					.. ", "
+					.. tostring(recommendedSize.Z)
+					.. "."
+			)
+			warned = true
+		end
+
+		task.wait(5)
 	end
-
-	if existing then
-		existing.Name = name .. "_Old"
-	end
-
-	local folder = Instance.new("Folder")
-	folder.Name = name
-	folder.Parent = Workspace
-	return folder
 end
 
-ensureFolder(GameData.Spawn.WasteZoneName)
-
-local startTime = os.clock()
-local spawnSurface = Workspace:FindFirstChild(GameData.Spawn.SurfaceName)
-while not spawnSurface and os.clock() - startTime < 5 do
-	task.wait(0.1)
-	spawnSurface = Workspace:FindFirstChild(GameData.Spawn.SurfaceName)
-end
-
-if not spawnSurface then
-	warn("[GEI] SpawnSurface1 is missing. MapBuilder should create it before gameplay starts.")
-end
+task.spawn(function()
+	waitForRequiredPart(GameData.Spawn.SurfaceName, GameData.World.SpawnSurface.Size)
+end)
