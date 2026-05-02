@@ -23,28 +23,28 @@ GameData.Economy = {
 }
 
 GameData.World = {
+	LobbyFloor = {
+		Position = Vector3.new(0, 0, 0),
+		Size = Vector3.new(120, 2, 120),
+		Color = Color3.fromRGB(112, 123, 118),
+	},
 	SpawnSurface = {
-		Position = Vector3.new(0, 0, 20),
-		Size = Vector3.new(140, 1, 110),
-		Color = Color3.fromRGB(87, 122, 82),
+		Position = Vector3.new(0, 1.1, 20),
+		Size = Vector3.new(80, 1, 60),
+		Color = Color3.fromRGB(87, 136, 82),
 	},
 	SpawnLocation = {
-		Position = Vector3.new(0, 3, -48),
+		Position = Vector3.new(0, 3, -35),
 	},
 	SellZone = {
-		Position = Vector3.new(38, 1, -36),
-		Size = Vector3.new(22, 2, 16),
-		Color = Color3.fromRGB(84, 180, 107),
+		Position = Vector3.new(-45, 2, -10),
+		Size = Vector3.new(22, 1, 18),
+		Color = Color3.fromRGB(88, 211, 117),
 	},
 	BuyZone = {
-		Position = Vector3.new(-38, 1, -36),
-		Size = Vector3.new(22, 2, 16),
-		Color = Color3.fromRGB(91, 145, 222),
-	},
-	Baseplate = {
-		Position = Vector3.new(0, -1.1, 0),
-		Size = Vector3.new(220, 2, 180),
-		Color = Color3.fromRGB(70, 75, 76),
+		Position = Vector3.new(45, 2, -10),
+		Size = Vector3.new(22, 1, 18),
+		Color = Color3.fromRGB(102, 138, 237),
 	},
 }
 

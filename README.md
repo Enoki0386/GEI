@@ -21,61 +21,119 @@ Le projet Rojo s'appelle `GEI` dans `default.project.json`.
 
 ```txt
 src/
-├── ReplicatedStorage/
-│   ├── GameData.luau
-│   ├── Remotes/
-│   ├── Shared/
-│   └── Tools/
-├── ServerScriptService/
-│   ├── Core/
-│   │   ├── PlayerManager.server.luau
-│   │   └── EventManager.server.luau
-│   └── Systems/
-│       ├── SpawnManager.server.luau
-│       ├── WasteNodeManager.server.luau
-│       ├── SellZoneManager.server.luau
-│       ├── ShopManager.server.luau
-│       └── BackpackManager.server.luau
-├── StarterGui/
-│   └── MainHUD/
-├── StarterPlayer/
-│   └── StarterPlayerScripts/
-│       ├── ClientManager.client.luau
-│       ├── ToolClient.client.luau
-│       ├── ShopClient.client.luau
-│       └── TutorialClient.client.luau
-└── Workspace/
+|-- ReplicatedStorage/
+|   |-- GameData.luau
+|   |-- Remotes/
+|   |-- Shared/
+|   `-- Tools/
+|-- ServerScriptService/
+|   |-- Core/
+|   |   |-- MapBuilder.server.luau
+|   |   |-- PlayerManager.server.luau
+|   |   `-- EventManager.server.luau
+|   `-- Systems/
+|       |-- SpawnManager.server.luau
+|       |-- WasteNodeManager.server.luau
+|       |-- SellZoneManager.server.luau
+|       |-- ShopManager.server.luau
+|       `-- BackpackManager.server.luau
+|-- StarterGui/
+|   `-- MainHUD/
+|-- StarterPlayer/
+|   `-- StarterPlayerScripts/
+|       |-- ClientManager.client.luau
+|       |-- ToolClient.client.luau
+|       |-- ShopClient.client.luau
+|       `-- TutorialClient.client.luau
+`-- Workspace/
 ```
 
-## Objets Workspace
+## Map de depart
 
-Au lancement, `SpawnManager.server.luau` cree automatiquement si besoin :
+La premiere map est creee automatiquement par :
 
+```txt
+src/ServerScriptService/Core/MapBuilder.server.luau
+```
+
+Ce script cree ou met a jour sans doublonner :
+
+- `Workspace.SpawnLocation`
+- `Workspace.LobbyFloor`
 - `Workspace.SpawnSurface1`
 - `Workspace.WasteZone`
 - `Workspace.SellZone`
 - `Workspace.BuyZone`
-- `Workspace.SpawnLocation`
-- `Workspace.GEIBaseplate`
+- `Workspace.MapDecor`
 
-Les Waste Nodes spawnent uniquement sur `SpawnSurface1`. Le systeme evite les joueurs et garde une distance minimale entre les piles.
+Layout actuel :
+
+- centre / arriere : lobby et `SpawnLocation`
+- devant : `SpawnSurface1`, la zone officielle de spawn des Waste Nodes
+- gauche : `SellZone`
+- droite : `BuyZone`
+- autour : bordures, chemins, kiosques simples, labels `SELL`, `SHOP`, `WASTE AREA`
+
+## Modifier la map
+
+Les positions, tailles, couleurs et noms de zones sont dans `MapBuilder.server.luau`, section :
+
+```lua
+-- CONFIGURATION FACILE A MODIFIER
+```
+
+Les valeurs importantes :
+
+- `MAP_CONFIG.LobbyFloor.Position` et `MAP_CONFIG.LobbyFloor.Size`
+- `MAP_CONFIG.WasteArea.Position` et `MAP_CONFIG.WasteArea.Size`
+- `MAP_CONFIG.SellZone.Position` et `MAP_CONFIG.SellZone.Size`
+- `MAP_CONFIG.BuyZone.Position` et `MAP_CONFIG.BuyZone.Size`
+- `MAP_CONFIG.SpawnLocation.Position`
+
+Les memes positions de fallback sont aussi gardees dans `src/ReplicatedStorage/GameData.luau`, section `GameData.World`, pour que les scripts serveur aient des valeurs coherentes si la map doit etre creee en urgence pendant un test.
+
+## Modifier SpawnSurface1
+
+La taille et la position principales de `SpawnSurface1` sont ici :
+
+```txt
+src/ServerScriptService/Core/MapBuilder.server.luau
+```
+
+Dans `MAP_CONFIG.WasteArea`.
+
+Le spawn dynamique des Waste Nodes utilise toujours le nom officiel :
+
+```lua
+GameData.Spawn.SurfaceName -- "SpawnSurface1"
+```
+
+Les Waste Nodes ne spawnent pas dans le lobby : ils sont places uniquement sur `Workspace.SpawnSurface1`, avec une distance minimale par rapport aux joueurs et aux autres Waste Nodes.
+
+## Deplacer SellZone ou BuyZone
+
+Dans `MapBuilder.server.luau` :
+
+- modifier `MAP_CONFIG.SellZone.Position` pour deplacer la vente
+- modifier `MAP_CONFIG.BuyZone.Position` pour deplacer le shop
+
+`SellZoneManager.server.luau` et `ShopManager.server.luau` cherchent directement `Workspace.SellZone` et `Workspace.BuyZone`, donc les fonctionnalites suivent automatiquement les parts.
 
 ## Tester le MVP
 
-1. Appuyer sur Play dans Studio.
-2. Le joueur spawn dans la zone de depart.
-3. Cliquer sur une pile de Waste a portee.
-4. Le Waste perd des HP numeriques au-dessus de lui.
-5. Quand il est detruit, le sac gagne du Waste et peut parfois gagner des Diamonds.
-6. Marcher sur `SellZone` pour vendre automatiquement.
-7. Marcher sur `BuyZone` pour ouvrir le Shop.
-8. Acheter/equiper des outils et sacs si le joueur a assez de Cash.
+1. Lancer `rojo serve`.
+2. Connecter Roblox Studio au serveur Rojo.
+3. Appuyer sur Play.
+4. Verifier que le joueur spawn dans le lobby.
+5. Aller dans `WASTE AREA` et cliquer un Waste Node avec `Brush`.
+6. Quand le sac contient du Waste, marcher sur `SELL`.
+7. Marcher sur `SHOP` pour ouvrir l'interface tablette.
 
 L'outil de depart est `Brush`. Il peut etre equipe avec la touche `1` ou via la barre custom en bas de l'ecran.
 
-## Modifier les configs
+## Modifier les configs gameplay
 
-Tout se trouve dans `src/ReplicatedStorage/GameData.luau`, section :
+Tout le gameplay configurable se trouve dans `src/ReplicatedStorage/GameData.luau`, section :
 
 ```lua
 -- CONFIGURATION FACILE A MODIFIER
@@ -90,7 +148,6 @@ On peut y modifier :
 - chances de Diamonds : `DiamondChance`
 - degats / range / cooldown des outils : `GameData.Tools`
 - capacite des sacs : `GameData.Backpacks`
-- positions et tailles des zones : `GameData.World`
 
 ## Ajouter un outil
 
