@@ -60,6 +60,16 @@ GameData.Animations = {
 	BrushSwing = "rbxassetid://0", -- à remplacer plus tard
 }
 
+GameData.Sounds = {
+	WasteHit = "",
+	WasteBreak = "",
+	Sell = "",
+	Buy = "",
+	Error = "",
+	Footstep = "",
+	Jump = "",
+}
+
 GameData.Economy = {
 	WasteCashValue = 1,
 	SellCooldown = 1,
@@ -109,6 +119,7 @@ GameData.Tools = {
 		Cooldown = 0.45,
 		Color = Color3.fromRGB(245, 190, 86),
 		Description = "A trusty starter brush for cleaning small piles.",
+		ModelName = "Brush",
 		Visual = {
 			HandleColor = Color3.fromRGB(242, 178, 80),
 			BristleColor = Color3.fromRGB(232, 239, 224),
@@ -125,6 +136,7 @@ GameData.Tools = {
 		Cooldown = 0.5,
 		Color = Color3.fromRGB(237, 103, 88),
 		Description = "A heavier cleaner that breaks tougher piles faster.",
+		ModelName = "Crusher",
 		Visual = {
 			HandleColor = Color3.fromRGB(95, 98, 104),
 			BristleColor = Color3.fromRGB(237, 103, 88),
@@ -141,6 +153,7 @@ GameData.Tools = {
 		Cooldown = 0.42,
 		Color = Color3.fromRGB(95, 211, 210),
 		Description = "A focused cleanup wand with strong power.",
+		ModelName = "VacuumWand",
 		Visual = {
 			HandleColor = Color3.fromRGB(55, 73, 92),
 			BristleColor = Color3.fromRGB(95, 211, 210),
@@ -205,7 +218,7 @@ GameData.WasteTypes = {
 		Color = Color3.fromRGB(112, 156, 85),
 		AccentColor = Color3.fromRGB(184, 229, 112),
 		VisualSize = Vector3.new(4, 2.4, 4),
-		ModelName = nil,
+		ModelName = "CommonWaste",
 	},
 	RareWaste = {
 		Id = "RareWaste",
@@ -219,7 +232,7 @@ GameData.WasteTypes = {
 		Color = Color3.fromRGB(77, 142, 210),
 		AccentColor = Color3.fromRGB(136, 205, 255),
 		VisualSize = Vector3.new(5, 3, 5),
-		ModelName = nil,
+		ModelName = "RareWaste",
 	},
 	EpicWaste = {
 		Id = "EpicWaste",
@@ -233,7 +246,7 @@ GameData.WasteTypes = {
 		Color = Color3.fromRGB(145, 86, 211),
 		AccentColor = Color3.fromRGB(222, 171, 255),
 		VisualSize = Vector3.new(6, 3.6, 6),
-		ModelName = nil,
+		ModelName = "EpicWaste",
 	},
 }
 

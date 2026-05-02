@@ -16,6 +16,9 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 10)
+	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 10)
+local SoundUtil = soundUtilModule and require(soundUtilModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ClientManager stopped.")
@@ -448,6 +451,9 @@ end
 
 if sellFeedbackRemote then
 	sellFeedbackRemote.OnClientEvent:Connect(function(cashEarned)
+		if SoundUtil then
+			SoundUtil.Play("Sell", GameData, playerGui)
+		end
 		showFloating("+" .. formatNumber(cashEarned) .. " Cash", Color3.fromRGB(119, 242, 143))
 	end)
 end

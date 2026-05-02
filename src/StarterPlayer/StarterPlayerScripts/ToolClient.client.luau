@@ -16,6 +16,9 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 10)
+	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 10)
+local SoundUtil = soundUtilModule and require(soundUtilModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ToolClient stopped.")
@@ -334,6 +337,10 @@ end)
 if attackFeedbackRemote then
 	attackFeedbackRemote.OnClientEvent:Connect(function(feedback)
 		if type(feedback) == "table" and feedback.Target then
+			if SoundUtil then
+				local hitbox = feedback.Target.PrimaryPart or feedback.Target:FindFirstChild("Hitbox")
+				SoundUtil.Play(feedback.Destroyed and "WasteBreak" or "WasteHit", GameData, hitbox)
+			end
 			playTargetFlash(feedback.Target)
 		end
 	end)

@@ -28,6 +28,8 @@ src/
 |   |-- Remotes/
 |   |-- Shared/
 |   |-- Tools/
+|   |-- ToolModels/
+|   |-- Sounds/
 |   `-- WasteModels/
 |-- ServerScriptService/
 |   |-- Core/
@@ -157,7 +159,7 @@ Use Roblox Studio for visual work. The code should provide gameplay systems, not
 ### 1. Create or replace the real `Brush` Tool
 
 1. In Roblox Studio, open `ReplicatedStorage`.
-2. Open or create the `Tools` folder.
+2. Open or create the `ToolModels` folder.
 3. Insert Object -> `Tool`.
 4. Name it exactly `Brush`.
 5. Inside `Brush`, insert a `Part` named exactly `Handle`.
@@ -169,14 +171,14 @@ Expected structure:
 
 ```txt
 ReplicatedStorage
-`-- Tools
+`-- ToolModels
     `-- Brush (Tool)
         |-- Handle (Part)
         |-- OptionalVisualPart (Part)
         `-- WeldConstraint
 ```
 
-The code uses your `ReplicatedStorage.Tools.Brush` if it exists and has a `Handle`. It only creates a simple fallback Tool when that Tool is missing or invalid.
+The code uses your `ReplicatedStorage.Tools.Brush` if it exists and has a `Handle`, or `ReplicatedStorage.ToolModels.Brush` if you place the manual asset there. It only creates a simple fallback Tool when no valid manual Tool/model is available.
 
 ### 2. Enable native Shift Lock
 
@@ -223,6 +225,18 @@ Do not rename the gameplay objects unless you also update `src/ReplicatedStorage
 
 Edit `src/ReplicatedStorage/GameData.luau` for most balancing values. The key systems that consume those values are listed in `Where To Edit Values`.
 
+## Manual Assets
+
+Rojo is configured to preserve unknown children inside these folders, so you can add Studio-made assets there without the sync deleting them:
+
+- `ReplicatedStorage.ToolModels`: manual Tool assets. Name each asset to match `GameData.Tools.<ToolId>.ModelName`, for example `VacuumWand`. Preferred structure is a real Roblox `Tool` with a `Handle`; a `Model` or `Folder` containing a `Handle` also works and is wrapped into a Tool at runtime.
+- `ReplicatedStorage.WasteModels`: manual Waste models. Name each model to match `GameData.WasteTypes.<WasteId>.ModelName`, for example `CommonWaste`, `RareWaste`, or `EpicWaste`.
+- `ReplicatedStorage.Sounds`: manual `Sound` objects. Use exact names `WasteHit`, `WasteBreak`, `Sell`, `Buy`, and `Error`.
+
+If a manual model or sound is missing, the game uses the existing fallback visuals and simply skips that sound. Do not use `rbxassetid://0`; empty or zero ids are ignored.
+
+Footstep and jump sounds are prepared in `GameData.Sounds` as `Footstep` and `Jump`. Add matching `Sound` objects in `ReplicatedStorage.Sounds` later when you want custom player movement audio.
+
 ## What The Scripts Use
 
 - `WasteNodeManager.server.luau` spawns Waste Nodes only on `Workspace.SpawnSurface1`.
@@ -230,7 +244,7 @@ Edit `src/ReplicatedStorage/GameData.luau` for most balancing values. The key sy
 - `ShopManager.server.luau` uses `Workspace.BuyZone`.
 - `SpawnManager.server.luau` checks for `Workspace.SpawnSurface1`.
 - `MapValidator.server.luau` validates all required manual objects.
-- `ToolVisualManager.server.luau` creates native Roblox `Tool` instances with `Handle` parts in `ReplicatedStorage.Tools`, then clones owned tools into the player's Backpack.
+- `ToolVisualManager.server.luau` creates native Roblox `Tool` instances with `Handle` parts in `ReplicatedStorage.Tools`, then clones only the active equipped Tool into the player's Backpack.
 
 No script should generate a lobby, decorative platforms, borders, full map, or visual decorations. Create visual map elements manually in Roblox Studio.
 
@@ -272,6 +286,7 @@ You can modify:
 - real attack radius formula: `GameData.Interaction`
 - dotted interaction circle settings: `GameData.InteractionCircle`
 - Roblox animation ids: `GameData.Animations`
+- sound ids / sound names: `GameData.Sounds`
 - future assistant / worker placeholder config: `GameData.FutureUnits`
 
 ## Where To Edit Values
@@ -314,6 +329,7 @@ Exact files to edit:
 - `src/ServerScriptService/Systems/SpawnManager.server.luau`: required `SpawnSurface1` validation.
 - `src/StarterPlayer/StarterPlayerScripts/ClientManager.client.luau`: toolbar and main HUD visuals.
 - `src/StarterPlayer/StarterPlayerScripts/ToolClient.client.luau`: local attack requests, Tool swing feedback, and interaction circle animation.
+- `src/ReplicatedStorage/Shared/SoundUtil.luau`: shared sound lookup/play helper for manual `ReplicatedStorage.Sounds` assets and non-zero SoundIds.
 
 Attack range currently comes from each Waste Node's `InteractionRadius` Attribute. The server and circle visual both use:
 
@@ -351,7 +367,7 @@ SuperBrush = {
 
 The Shop and custom toolbar update from this config.
 
-`ToolVisualManager.server.luau` creates a native fallback `Tool` if `ReplicatedStorage.Tools.SuperBrush` does not exist. Later, you can replace the fallback by creating your own Roblox `Tool` under `ReplicatedStorage.Tools` with:
+`ToolVisualManager.server.luau` creates a native fallback `Tool` if no valid manual asset exists. Later, you can replace the fallback by creating your own Roblox `Tool` under `ReplicatedStorage.ToolModels` with:
 
 - a `Tool` named exactly `SuperBrush`
 - a `Handle` part

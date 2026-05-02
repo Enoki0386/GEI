@@ -47,19 +47,34 @@ local function weldTo(part0, part1)
 	return weld
 end
 
+local function prepareTool(tool, toolConfig)
+	tool.Name = toolConfig.Id
+	tool.ToolTip = toolConfig.Name
+	tool.CanBeDropped = false
+	tool.RequiresHandle = true
+	tool.Grip = (toolConfig.Visual and toolConfig.Visual.GripOffset) or tool.Grip or DEFAULT_GRIP
+	tool:SetAttribute("ToolId", toolConfig.Id)
+	tool:SetAttribute("GEINativeTool", true)
+
+	for _, descendant in ipairs(tool:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = false
+			descendant.CanCollide = false
+			descendant.CanQuery = false
+			descendant.CanTouch = false
+			descendant.Massless = true
+		end
+	end
+
+	return tool
+end
+
 local function createFallbackTool(toolConfig)
 	local visualConfig = toolConfig.Visual or {}
 	local handleColor = visualConfig.HandleColor or toolConfig.Color
 	local bristleColor = visualConfig.BristleColor or Color3.fromRGB(235, 238, 228)
 
 	local tool = Instance.new("Tool")
-	tool.Name = toolConfig.Id
-	tool.ToolTip = toolConfig.Name
-	tool.CanBeDropped = false
-	tool.RequiresHandle = true
-	tool.Grip = visualConfig.GripOffset or DEFAULT_GRIP
-	tool:SetAttribute("ToolId", toolConfig.Id)
-	tool:SetAttribute("GEINativeTool", true)
 
 	local handle = createPart("Handle", Vector3.new(0.22, 1.65, 0.22), handleColor, Enum.Material.Wood, tool)
 	handle.Shape = Enum.PartType.Cylinder
@@ -74,12 +89,6 @@ local function createFallbackTool(toolConfig)
 		weldTo(head, bristle)
 	end
 
-	local hitSound = Instance.new("Sound")
-	hitSound.Name = "HitSound"
-	hitSound.SoundId = "rbxassetid://0"
-	hitSound.Volume = 0.25
-	hitSound.Parent = handle
-
 	local particles = Instance.new("ParticleEmitter")
 	particles.Name = "SwingParticles"
 	particles.Enabled = false
@@ -90,7 +99,58 @@ local function createFallbackTool(toolConfig)
 	particles.SpreadAngle = Vector2.new(35, 35)
 	particles.Parent = handle
 
-	return tool
+	return prepareTool(tool, toolConfig)
+end
+
+local function getToolModelSource(toolConfig)
+	local modelsFolder = ReplicatedStorage:FindFirstChild("ToolModels")
+	if not modelsFolder then
+		return nil
+	end
+
+	local modelName = toolConfig.ModelName
+	if type(modelName) ~= "string" or modelName == "" then
+		modelName = toolConfig.Id
+	end
+
+	return modelsFolder:FindFirstChild(modelName)
+end
+
+local function createToolFromModelSource(toolConfig, source)
+	if not source then
+		return nil
+	end
+
+	if source:IsA("Tool") then
+		local tool = source:Clone()
+		if not tool:FindFirstChild("Handle") then
+			warn("[ToolVisualManager] ToolModels." .. source.Name .. " is a Tool but has no Handle. Using fallback Tool.")
+			tool:Destroy()
+			return nil
+		end
+
+		return prepareTool(tool, toolConfig)
+	end
+
+	if source:IsA("Model") or source:IsA("Folder") then
+		local tool = Instance.new("Tool")
+		local sourceClone = source:Clone()
+		for _, child in ipairs(sourceClone:GetChildren()) do
+			child.Parent = tool
+		end
+		sourceClone:Destroy()
+
+		if not tool:FindFirstChild("Handle") then
+			warn("[ToolVisualManager] ToolModels." .. source.Name .. " must contain a Part named Handle. Using fallback Tool.")
+			tool:Destroy()
+			return nil
+		end
+
+		return prepareTool(tool, toolConfig)
+	end
+
+	warn("[ToolVisualManager] ToolModels." .. source.Name .. " must be a Tool, Model, or Folder. Using fallback Tool.")
+	return nil
 end
 
 local function ensureToolTemplate(toolId)
@@ -102,10 +162,7 @@ local function ensureToolTemplate(toolId)
 	local toolsFolder = getToolsFolder()
 	local existing = toolsFolder:FindFirstChild(toolId)
 	if existing and existing:IsA("Tool") and existing:FindFirstChild("Handle") then
-		existing.CanBeDropped = false
-		existing:SetAttribute("ToolId", toolId)
-		existing:SetAttribute("GEINativeTool", true)
-		return existing
+		return prepareTool(existing, toolConfig)
 	end
 
 	if existing then
@@ -113,7 +170,7 @@ local function ensureToolTemplate(toolId)
 		existing:Destroy()
 	end
 
-	local tool = createFallbackTool(toolConfig)
+	local tool = createToolFromModelSource(toolConfig, getToolModelSource(toolConfig)) or createFallbackTool(toolConfig)
 	tool.Parent = toolsFolder
 	return tool
 end
@@ -214,17 +271,17 @@ local function syncInventory(player)
 	local character = player.Character
 	removeOldCustomVisual(character)
 
-	local ownedTools = dataFolder:FindFirstChild("OwnedTools")
-	if not ownedTools then
+	local equippedTool = dataFolder:FindFirstChild("EquippedTool")
+	local activeToolId = equippedTool and equippedTool.Value or "Brush"
+	if not activeToolId then
 		return
 	end
 
 	for _, toolId in ipairs(GameData.ToolOrder) do
-		local ownedValue = ownedTools:FindFirstChild(toolId)
-		local owns = ownedValue and ownedValue:IsA("BoolValue") and ownedValue.Value == true
+		local shouldHaveTool = toolId == activeToolId and playerOwnsTool(player, toolId)
 		local existing = getToolInstance(player, toolId)
 
-		if owns then
+		if shouldHaveTool then
 			if not existing then
 				local template = ensureToolTemplate(toolId)
 				if template then

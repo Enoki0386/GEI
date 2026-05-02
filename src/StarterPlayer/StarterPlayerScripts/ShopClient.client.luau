@@ -10,6 +10,9 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 10)
+	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 10)
+local SoundUtil = soundUtilModule and require(soundUtilModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ShopClient stopped.")
@@ -661,6 +664,10 @@ if purchaseResultRemote then
 		local itemName = config and config.Name or tostring(itemId)
 
 		if ok then
+			if SoundUtil and reason == "Bought" then
+				SoundUtil.Play("Buy", GameData, playerGui)
+			end
+
 			if reason == "Bought" then
 				showNotification("Bought " .. itemName, Color3.fromRGB(136, 255, 164))
 			elseif reason == "Equipped" then
@@ -671,6 +678,10 @@ if purchaseResultRemote then
 				showNotification("Updated " .. itemName, Color3.fromRGB(220, 235, 255))
 			end
 		else
+			if SoundUtil then
+				SoundUtil.Play("Error", GameData, playerGui)
+			end
+
 			local message = "Could not buy " .. itemName
 			if reason == "NotEnoughCash" then
 				message = "Not enough Cash for " .. itemName

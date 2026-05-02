@@ -4,7 +4,33 @@
     "$className": "DataModel",
 
     "ReplicatedStorage": {
-      "$path": "src/ReplicatedStorage"
+      "$className": "ReplicatedStorage",
+      "GameData": {
+        "$path": "src/ReplicatedStorage/GameData.luau"
+      },
+      "Remotes": {
+        "$path": "src/ReplicatedStorage/Remotes",
+        "$ignoreUnknownInstances": true
+      },
+      "Shared": {
+        "$path": "src/ReplicatedStorage/Shared"
+      },
+      "Tools": {
+        "$path": "src/ReplicatedStorage/Tools",
+        "$ignoreUnknownInstances": true
+      },
+      "ToolModels": {
+        "$path": "src/ReplicatedStorage/ToolModels",
+        "$ignoreUnknownInstances": true
+      },
+      "WasteModels": {
+        "$path": "src/ReplicatedStorage/WasteModels",
+        "$ignoreUnknownInstances": true
+      },
+      "Sounds": {
+        "$path": "src/ReplicatedStorage/Sounds",
+        "$ignoreUnknownInstances": true
+      }
     },
 
     "ServerScriptService": {
