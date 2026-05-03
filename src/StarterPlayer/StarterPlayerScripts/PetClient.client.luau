@@ -536,16 +536,17 @@ local function refreshDetails()
 	local petData = selectedPetUid and getPetByUid(selectedPetUid)
 	local equippedSet = getEquippedSet()
 	local buffs = currentPets.Buffs or {}
+	local hasInventory = #(currentPets.Inventory or {}) > 0
 	totalBuffs.Text = "Bonus totaux : Cash " .. formatMultiplier(buffs.CashMultiplier)
 		.. " | Degats " .. formatMultiplier(buffs.DamageMultiplier)
 		.. " | Sac " .. formatMultiplier(buffs.BackpackMultiplier)
 
 	if not petData then
 		preview.BackgroundColor3 = Color3.fromRGB(90, 100, 106)
-		detailTitle.Text = "Choisis un pet"
+		detailTitle.Text = hasInventory and "Sélectionne un pet" or "Aucun pet équipé."
 		detailMeta.Text = ""
-		detailDescription.Text = "Clique un pet pour voir ses bonus."
-		detailBuffs.Text = "Les bonus totaux sont affiches plus bas."
+		detailDescription.Text = hasInventory and "Sélectionne un pet pour voir ses détails." or "Ouvre un œuf pour obtenir un pet bonus."
+		detailBuffs.Text = "Les bonus totaux restent visibles ici."
 		equipButton.Text = "Equiper"
 		equipButton.AutoButtonColor = false
 		destroyButton.AutoButtonColor = false
@@ -579,21 +580,47 @@ local function clearInventory()
 end
 
 local function refreshInventory()
+	if gridLayout.Parent ~= inventoryFrame then
+		gridLayout.Parent = inventoryFrame
+	end
 	clearInventory()
 	local equippedSet = getEquippedSet()
 	local inventory = currentPets.Inventory or {}
+	local equippedCount = #(currentPets.Equipped or {})
 	storageLabel.Text = "Stockage " .. tostring(#inventory) .. "/" .. tostring(currentPets.MaxStorage or 30)
-	equippedLabel.Text = "Equipes " .. tostring(#(currentPets.Equipped or {})) .. "/" .. tostring(currentPets.MaxEquipped or 3)
+	equippedLabel.Text = equippedCount > 0 and ("Équipés " .. tostring(equippedCount) .. "/" .. tostring(currentPets.MaxEquipped or 3)) or "Aucun pet équipé."
 
 	if #inventory == 0 then
-		local empty = new("TextLabel", {
+		gridLayout.Parent = nil
+		local emptyFrame = new("Frame", {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+		}, inventoryFrame)
+
+		local emptyTitle = new("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamBold,
+			Position = UDim2.fromScale(0.5, 0.43),
+			Size = UDim2.new(1, -32, 0, 34),
 			Text = "Vous n'avez pas encore de pet.",
-			TextColor3 = Color3.fromRGB(180, 194, 201),
+			TextColor3 = Color3.fromRGB(221, 232, 236),
 			TextScaled = true,
-		}, inventoryFrame)
-		new("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 10 }, empty)
+		}, emptyFrame)
+		new("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 10 }, emptyTitle)
+
+		local emptyHint = new("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 0),
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.fromScale(0.5, 0.52),
+			Size = UDim2.new(1, -40, 0, 26),
+			Text = "Ouvre un œuf pour en obtenir un.",
+			TextColor3 = Color3.fromRGB(162, 178, 186),
+			TextScaled = true,
+		}, emptyFrame)
+		new("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 8 }, emptyHint)
+
 		refreshDetails()
 		return
 	end
