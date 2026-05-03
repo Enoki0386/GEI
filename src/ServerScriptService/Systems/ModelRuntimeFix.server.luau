@@ -65,6 +65,59 @@ local function getWasteModelTuning(zoneId, wasteId, variantName)
 	}
 end
 
+local function getBillboardYOffset(tuning)
+	local offset = tuning and tuning.BillboardOffset
+	if typeof(offset) == "Vector3" then
+		return offset.Y
+	end
+
+	return 4
+end
+
+local function getBillboardBaseCenter(ringCenter, boundsCenter)
+	return Vector3.new(ringCenter.X, boundsCenter.Y, ringCenter.Z)
+end
+
+local function createOrUpdateBillboardAnchor(wasteModel, baseCenter)
+	local anchor = wasteModel:FindFirstChild("BillboardAnchor")
+	if anchor and not anchor:IsA("BasePart") then
+		anchor:Destroy()
+		anchor = nil
+	end
+
+	if not anchor then
+		anchor = Instance.new("Part")
+		anchor.Name = "BillboardAnchor"
+		anchor.Parent = wasteModel
+	end
+
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+	anchor.CFrame = CFrame.new(baseCenter)
+
+	return anchor
+end
+
+local function needsBillboardAnchorFix(wasteModel)
+	local anchor = wasteModel:FindFirstChild("BillboardAnchor")
+	if not (anchor and anchor:IsA("BasePart")) then
+		return true
+	end
+
+	local anchoredBillboard = anchor:FindFirstChild("WasteBillboard")
+	if anchoredBillboard and anchoredBillboard:IsA("BillboardGui") then
+		return false
+	end
+
+	local primaryPart = wasteModel.PrimaryPart
+	local oldBillboard = primaryPart and primaryPart:FindFirstChild("WasteBillboard")
+	return oldBillboard ~= nil
+end
+
 local function choosePrimaryPart(visual)
 	if visual:IsA("BasePart") then
 		return visual
@@ -170,12 +223,21 @@ local function recreateRing(wasteModel, boundsCenter, boundsSize, wasteConfig, t
 			* CFrame.Angles(0, -angle - math.pi / 2, 0)
 		segment.Parent = ringFolder
 	end
+
+	return center
 end
 
-local function updateBillboard(primaryPart, boundsCenter, tuning)
-	local billboard = primaryPart:FindFirstChild("WasteBillboard")
+local function updateBillboard(wasteModel, primaryPart, billboardBaseCenter, tuning)
+	local anchor = createOrUpdateBillboardAnchor(wasteModel, billboardBaseCenter)
+	local billboard = anchor:FindFirstChild("WasteBillboard")
+	if not (billboard and billboard:IsA("BillboardGui")) then
+		billboard = primaryPart:FindFirstChild("WasteBillboard")
+	end
+
 	if billboard and billboard:IsA("BillboardGui") then
-		billboard.StudsOffset = boundsCenter + tuning.BillboardOffset - primaryPart.Position
+		billboard.Adornee = anchor
+		billboard.StudsOffset = Vector3.new(0, getBillboardYOffset(tuning), 0)
+		billboard.Parent = anchor
 	end
 end
 
@@ -193,7 +255,7 @@ local function applyRuntimeFix(wasteModel)
 	end
 
 	local tuning = getWasteModelTuning(zoneId, wasteId, variantName)
-	if wasteModel:GetAttribute("ModelConfigVersion") == tuning.Version then
+	if wasteModel:GetAttribute("ModelConfigVersion") == tuning.Version and not needsBillboardAnchorFix(wasteModel) then
 		return
 	end
 
@@ -220,8 +282,9 @@ local function applyRuntimeFix(wasteModel)
 
 	wasteModel.PrimaryPart = primaryPart
 	local boundsCFrame, boundsSize = getVisualBounds(visual)
-	recreateRing(wasteModel, boundsCFrame.Position, boundsSize, wasteConfig, tuning)
-	updateBillboard(primaryPart, boundsCFrame.Position, tuning)
+	local ringCenter = recreateRing(wasteModel, boundsCFrame.Position, boundsSize, wasteConfig, tuning)
+	local billboardBaseCenter = getBillboardBaseCenter(ringCenter, boundsCFrame.Position)
+	updateBillboard(wasteModel, primaryPart, billboardBaseCenter, tuning)
 	wasteModel:SetAttribute("ModelConfigVersion", tuning.Version)
 	print(string.format("[ModelRuntimeFix] Refreshed %s/%s Version=%d", wasteId, variantName, tuning.Version))
 end
