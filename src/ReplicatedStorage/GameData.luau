@@ -11,6 +11,12 @@ GameData.Debug = {
 	ToolDamageMultiplier = 1,
 }
 
+GameData.Admin = {
+	UserIds = {
+		[1990396002] = true,
+	},
+}
+
 GameData.Spawn = {
 	SurfaceName = "SpawnSurface1",
 	WasteZoneName = "WasteZone",
@@ -200,7 +206,7 @@ GameData.Pets = {
 GameData.Eggs = {
 	StarterEgg = {
 		Id = "StarterEgg",
-		DisplayName = "Oeuf de depart",
+		DisplayName = "Starter Egg",
 		Price = 500,
 		Currency = "Cash",
 		Pets = {
@@ -209,7 +215,7 @@ GameData.Eggs = {
 				Name = "Garbage Rat",
 				Rarity = "Common",
 				Chance = 50,
-				Description = "Un petit pet qui augmente tes gains de Cash.",
+				Description = "A tiny trash companion that boosts your Cash gains.",
 				Buffs = {
 					CashMultiplier = 1.05,
 				},
@@ -219,7 +225,7 @@ GameData.Eggs = {
 				Name = "Trash Cat",
 				Rarity = "Common",
 				Chance = 30,
-				Description = "Un pet tranquille qui ameliore ton sac.",
+				Description = "A chill trash cat that improves your backpack.",
 				Buffs = {
 					BackpackMultiplier = 1.05,
 				},
@@ -229,7 +235,7 @@ GameData.Eggs = {
 				Name = "Recycle Dog",
 				Rarity = "Rare",
 				Chance = 15,
-				Description = "Un compagnon qui aide tes degats et tes gains.",
+				Description = "A loyal recycler that boosts damage and Cash.",
 				Buffs = {
 					CashMultiplier = 1.10,
 					DamageMultiplier = 1.05,
@@ -240,7 +246,7 @@ GameData.Eggs = {
 				Name = "Toxic Slime",
 				Rarity = "Epic",
 				Chance = 4,
-				Description = "Un slime etrange avec de gros bonus de recyclage.",
+				Description = "A strange glowing slime with strong recycling bonuses.",
 				Buffs = {
 					CashMultiplier = 1.20,
 					DamageMultiplier = 1.10,
@@ -251,7 +257,7 @@ GameData.Eggs = {
 				Name = "Golden Raccoon",
 				Rarity = "Legendary",
 				Chance = 1,
-				Description = "Un pet legendaire qui booste fortement ta progression.",
+				Description = "A legendary raccoon that strongly boosts progression.",
 				Buffs = {
 					CashMultiplier = 1.35,
 					DamageMultiplier = 1.20,
