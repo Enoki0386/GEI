@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -24,26 +25,41 @@ end
 local hatchEggRemote = remotes:WaitForChild("HatchEgg", 20)
 local equipPetRemote = remotes:WaitForChild("EquipPet", 20)
 local unequipPetRemote = remotes:WaitForChild("UnequipPet", 20)
+local destroyPetRemote = remotes:WaitForChild("DestroyPet", 20)
+local fusePetRemote = remotes:WaitForChild("FusePet", 20)
 local petInventoryUpdatedRemote = remotes:WaitForChild("PetInventoryUpdated", 20)
 local playerDataRemote = remotes:WaitForChild("PlayerDataUpdate", 20)
 local playerGui = player:WaitForChild("PlayerGui", 20)
 
-if not hatchEggRemote or not equipPetRemote or not unequipPetRemote or not petInventoryUpdatedRemote or not playerGui then
+if not hatchEggRemote or not equipPetRemote or not unequipPetRemote or not destroyPetRemote or not fusePetRemote or not petInventoryUpdatedRemote or not playerGui then
 	warn("[PetClient] Required pet remotes or PlayerGui are missing. Pet UI disabled.")
 	return
 end
 
 local STARTER_EGG_ID = "StarterEgg"
+local FOLLOW_OFFSETS = {
+	Vector3.new(-3, 2, 3),
+	Vector3.new(3, 2, 3),
+	Vector3.new(0, 2.5, 4.5),
+}
+
 local currentPets = {
 	Inventory = {},
 	Equipped = {},
 	MaxEquipped = (GameData.Pets and GameData.Pets.MaxEquipped) or 3,
+	MaxStorage = (GameData.Pets and (GameData.Pets.MaxStorage or GameData.Pets.BasePetStorage)) or 30,
+	Discovered = {},
 	Buffs = GameData.Pets and GameData.Pets.DefaultBuffs or {
 		CashMultiplier = 1,
 		DamageMultiplier = 1,
 		BackpackMultiplier = 1,
 	},
 }
+local selectedPetUid = nil
+local followerModels = {}
+local eggOverlayGui = nil
+local eggPromptConnected = false
+local eggWarningShown = false
 
 local function new(className, properties, parent)
 	local instance = Instance.new(className)
@@ -66,8 +82,25 @@ local function formatNumber(value)
 end
 
 local function formatMultiplier(value)
-	value = tonumber(value) or 1
-	return string.format("x%.2f", value)
+	return string.format("x%.2f", tonumber(value) or 1)
+end
+
+local function getRarityColor(rarity)
+	local colors = GameData.Pets and GameData.Pets.RarityColors or {}
+	return colors[rarity] or Color3.fromRGB(255, 255, 255)
+end
+
+local function getPetConfig(petId)
+	return GameData.GetPet(petId)
+end
+
+local function getPetDisplayName(petData)
+	local config = petData and getPetConfig(petData.PetId)
+	local name = config and config.Name or (petData and petData.PetId) or "Pet"
+	if petData and petData.Variant == "Golden" then
+		return "Golden " .. name
+	end
+	return name
 end
 
 local function getEquippedSet()
@@ -78,9 +111,81 @@ local function getEquippedSet()
 	return result
 end
 
-local function getRarityColor(rarity)
-	local colors = GameData.Pets and GameData.Pets.RarityColors or {}
-	return colors[rarity] or Color3.fromRGB(255, 255, 255)
+local function getPetByUid(petUid)
+	for _, petData in ipairs(currentPets.Inventory or {}) do
+		if petData.Uid == petUid then
+			return petData
+		end
+	end
+	return nil
+end
+
+local function countNormalCopies(petId)
+	local count = 0
+	local equippedSet = getEquippedSet()
+	local hasEquippedCopy = false
+	for _, petData in ipairs(currentPets.Inventory or {}) do
+		if petData.PetId == petId and (petData.Variant or "Normal") == "Normal" then
+			count += 1
+			if equippedSet[petData.Uid] then
+				hasEquippedCopy = true
+			end
+		end
+	end
+	return count, hasEquippedCopy
+end
+
+local function setPetsSnapshot(snapshot)
+	if type(snapshot) ~= "table" then
+		return
+	end
+
+	currentPets.Inventory = type(snapshot.Inventory) == "table" and snapshot.Inventory or {}
+	currentPets.Equipped = type(snapshot.Equipped) == "table" and snapshot.Equipped or {}
+	currentPets.MaxEquipped = type(snapshot.MaxEquipped) == "number" and snapshot.MaxEquipped or currentPets.MaxEquipped
+	currentPets.MaxStorage = type(snapshot.MaxStorage) == "number" and snapshot.MaxStorage or currentPets.MaxStorage
+	currentPets.Discovered = type(snapshot.Discovered) == "table" and snapshot.Discovered or currentPets.Discovered
+	currentPets.Buffs = type(snapshot.Buffs) == "table" and snapshot.Buffs or currentPets.Buffs
+
+	if selectedPetUid and not getPetByUid(selectedPetUid) then
+		selectedPetUid = nil
+	end
+end
+
+local function getErrorMessage(reason)
+	local messages = {
+		NotEnoughCash = "Pas assez de Cash.",
+		InventoryFull = "Vous n'avez plus d'espace.",
+		MaxEquipped = "Vous avez deja 3 pets equipes.",
+		DestroyEquipped = "Desequipe ce pet avant de le detruire.",
+		FuseEquipped = "Desequipe les pets avant de fusionner.",
+		NotEnoughDuplicates = "Pas assez de doubles pour fusionner.",
+		InvalidEgg = "Egg invalide.",
+		InvalidPet = "Pet invalide.",
+		NotOwned = "Ce pet n'est pas dans ton inventaire.",
+	}
+	return messages[reason] or "Action impossible."
+end
+
+local function invokePetRemote(remote, ...)
+	local ok, response = pcall(function(...)
+		return remote:InvokeServer(...)
+	end, ...)
+
+	if not ok then
+		warn("[PetClient] Remote request failed:", response)
+		return { Success = false, Error = "RequestFailed" }
+	end
+
+	if type(response) ~= "table" then
+		return { Success = false, Error = "BadResponse" }
+	end
+
+	if response.Pets then
+		setPetsSnapshot(response.Pets)
+	end
+
+	return response
 end
 
 local gui = playerGui:FindFirstChild("GEIPets")
@@ -96,32 +201,29 @@ gui = new("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 }, playerGui)
 
-local openButton = new("TextButton", {
+local inventoryButton = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 1),
 	AutoButtonColor = true,
-	BackgroundColor3 = Color3.fromRGB(28, 34, 39),
-	BackgroundTransparency = 0.02,
+	BackgroundColor3 = Color3.fromRGB(24, 30, 35),
+	BackgroundTransparency = 0.08,
 	BorderSizePixel = 0,
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(1, -22, 1, -122),
-	Size = UDim2.fromOffset(86, 42),
-	Text = "Eggs",
+	Size = UDim2.fromOffset(120, 42),
+	Text = "Inventaire",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, gui)
-new("UICorner", { CornerRadius = UDim.new(0, 14) }, openButton)
+new("UICorner", { CornerRadius = UDim.new(0, 14) }, inventoryButton)
 new("UIStroke", {
-	Color = Color3.fromRGB(255, 210, 85),
-	Thickness = 1.5,
-	Transparency = 0.16,
-}, openButton)
-new("UITextSizeConstraint", {
-	MaxTextSize = 17,
-	MinTextSize = 9,
-}, openButton)
+	Color = Color3.fromRGB(255, 255, 255),
+	Thickness = 1,
+	Transparency = 0.72,
+}, inventoryButton)
+new("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 8 }, inventoryButton)
 
 local overlay = new("Frame", {
-	Name = "Overlay",
+	Name = "InventoryOverlay",
 	BackgroundColor3 = Color3.fromRGB(6, 9, 12),
 	BackgroundTransparency = 0.45,
 	BorderSizePixel = 0,
@@ -130,43 +232,54 @@ local overlay = new("Frame", {
 }, gui)
 
 local panel = new("Frame", {
-	Name = "Panel",
+	Name = "InventoryPanel",
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = Color3.fromRGB(19, 24, 29),
+	BackgroundColor3 = Color3.fromRGB(18, 23, 28),
 	BackgroundTransparency = 0.02,
 	BorderSizePixel = 0,
 	Position = UDim2.fromScale(0.5, 0.52),
-	Size = UDim2.fromScale(0.74, 0.72),
+	Size = UDim2.fromScale(0.8, 0.74),
 }, overlay)
 new("UICorner", { CornerRadius = UDim.new(0, 22) }, panel)
-new("UIStroke", {
-	Color = Color3.fromRGB(255, 255, 255),
-	Thickness = 1,
-	Transparency = 0.72,
-}, panel)
-new("UISizeConstraint", {
-	MaxSize = Vector2.new(920, 580),
-	MinSize = Vector2.new(620, 420),
-}, panel)
-
-local panelScale = new("UIScale", {
-	Scale = 0.92,
-}, panel)
+new("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 1, Transparency = 0.72 }, panel)
+new("UISizeConstraint", { MaxSize = Vector2.new(1040, 620), MinSize = Vector2.new(700, 430) }, panel)
+local panelScale = new("UIScale", { Scale = 0.92 }, panel)
 
 local title = new("TextLabel", {
 	BackgroundTransparency = 1,
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(24, 18),
-	Size = UDim2.new(1, -86, 0, 36),
-	Text = "Pets & Eggs",
+	Size = UDim2.new(0.42, 0, 0, 36),
+	Text = "Inventaire",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
 }, panel)
-new("UITextSizeConstraint", {
-	MaxTextSize = 30,
-	MinTextSize = 14,
-}, title)
+new("UITextSizeConstraint", { MaxTextSize = 30, MinTextSize = 14 }, title)
+
+local storageLabel = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	Position = UDim2.fromOffset(24, 58),
+	Size = UDim2.fromOffset(190, 24),
+	Text = "Storage 0/30",
+	TextColor3 = Color3.fromRGB(190, 205, 212),
+	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, panel)
+new("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 8 }, storageLabel)
+
+local equippedLabel = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	Position = UDim2.fromOffset(220, 58),
+	Size = UDim2.fromOffset(160, 24),
+	Text = "Equipped 0/3",
+	TextColor3 = Color3.fromRGB(190, 205, 212),
+	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, panel)
+new("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 8 }, equippedLabel)
 
 local closeButton = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 0),
@@ -181,415 +294,897 @@ local closeButton = new("TextButton", {
 	TextScaled = true,
 }, panel)
 new("UICorner", { CornerRadius = UDim.new(0, 12) }, closeButton)
-new("UITextSizeConstraint", {
-	MaxTextSize = 18,
-	MinTextSize = 10,
-}, closeButton)
+new("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 10 }, closeButton)
 
-local eggPanel = new("Frame", {
-	BackgroundColor3 = Color3.fromRGB(27, 34, 40),
-	BackgroundTransparency = 0.04,
-	BorderSizePixel = 0,
-	Position = UDim2.fromOffset(24, 74),
-	Size = UDim2.new(0, 260, 1, -98),
-}, panel)
-new("UICorner", { CornerRadius = UDim.new(0, 18) }, eggPanel)
-
-local eggConfig = GameData.GetEgg(STARTER_EGG_ID)
-local eggTitle = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBlack,
-	Position = UDim2.fromOffset(18, 18),
-	Size = UDim2.new(1, -36, 0, 34),
-	Text = eggConfig and eggConfig.DisplayName or "Starter Egg",
-	TextColor3 = Color3.fromRGB(255, 226, 112),
-	TextScaled = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-}, eggPanel)
-new("UITextSizeConstraint", {
-	MaxTextSize = 24,
-	MinTextSize = 12,
-}, eggTitle)
-
-local eggPrice = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBold,
-	Position = UDim2.fromOffset(18, 58),
-	Size = UDim2.new(1, -36, 0, 28),
-	Text = eggConfig and (formatNumber(eggConfig.Price) .. " Cash") or "Unavailable",
-	TextColor3 = Color3.fromRGB(174, 236, 177),
-	TextScaled = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-}, eggPanel)
-new("UITextSizeConstraint", {
-	MaxTextSize = 16,
-	MinTextSize = 9,
-}, eggPrice)
-
-local hatchButton = new("TextButton", {
-	AutoButtonColor = true,
-	BackgroundColor3 = Color3.fromRGB(67, 174, 101),
-	BorderSizePixel = 0,
-	Font = Enum.Font.GothamBlack,
-	Position = UDim2.fromOffset(18, 102),
-	Size = UDim2.new(1, -36, 0, 44),
-	Text = "Hatch",
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	TextScaled = true,
-}, eggPanel)
-new("UICorner", { CornerRadius = UDim.new(0, 14) }, hatchButton)
-new("UITextSizeConstraint", {
-	MaxTextSize = 20,
-	MinTextSize = 10,
-}, hatchButton)
-
-local hatchResult = new("TextLabel", {
-	BackgroundColor3 = Color3.fromRGB(16, 20, 24),
-	BackgroundTransparency = 0.25,
+local messageLabel = new("TextLabel", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = Color3.fromRGB(25, 31, 36),
+	BackgroundTransparency = 0.08,
 	BorderSizePixel = 0,
 	Font = Enum.Font.GothamBold,
-	Position = UDim2.fromOffset(18, 164),
-	Size = UDim2.new(1, -36, 0, 68),
-	Text = "Open an egg to get a passive pet.",
-	TextColor3 = Color3.fromRGB(220, 230, 235),
-	TextScaled = true,
-	TextWrapped = true,
-}, eggPanel)
-new("UICorner", { CornerRadius = UDim.new(0, 14) }, hatchResult)
-new("UITextSizeConstraint", {
-	MaxTextSize = 15,
-	MinTextSize = 8,
-}, hatchResult)
-
-local buffsLabel = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBold,
-	Position = UDim2.fromOffset(18, 250),
-	Size = UDim2.new(1, -36, 0, 86),
+	Position = UDim2.new(0.5, 0, 0, 18),
+	Size = UDim2.fromOffset(390, 34),
 	Text = "",
-	TextColor3 = Color3.fromRGB(204, 216, 222),
-	TextScaled = true,
-	TextWrapped = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	TextYAlignment = Enum.TextYAlignment.Top,
-}, eggPanel)
-new("UITextSizeConstraint", {
-	MaxTextSize = 15,
-	MinTextSize = 8,
-}, buffsLabel)
-
-local equippedLabel = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBlack,
-	Position = UDim2.new(0, 306, 0, 76),
-	Size = UDim2.new(1, -330, 0, 30),
-	Text = "Equipped 0/3",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-}, panel)
-new("UITextSizeConstraint", {
-	MaxTextSize = 20,
-	MinTextSize = 10,
-}, equippedLabel)
+	Visible = false,
+	ZIndex = 6,
+}, gui)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, messageLabel)
+new("UITextSizeConstraint", { MaxTextSize = 15, MinTextSize = 8 }, messageLabel)
 
 local inventoryFrame = new("ScrollingFrame", {
 	Active = true,
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	BackgroundTransparency = 1,
+	BackgroundColor3 = Color3.fromRGB(12, 16, 20),
+	BackgroundTransparency = 0.28,
 	BorderSizePixel = 0,
 	CanvasSize = UDim2.fromOffset(0, 0),
-	Position = UDim2.fromOffset(306, 116),
+	Position = UDim2.fromOffset(24, 96),
 	ScrollBarImageColor3 = Color3.fromRGB(98, 112, 120),
 	ScrollBarThickness = 5,
-	Size = UDim2.new(1, -330, 1, -140),
+	Size = UDim2.new(1, -354, 1, -120),
 }, panel)
+new("UICorner", { CornerRadius = UDim.new(0, 16) }, inventoryFrame)
 
 local gridLayout = new("UIGridLayout", {
 	CellPadding = UDim2.fromOffset(12, 12),
-	CellSize = UDim2.fromOffset(170, 142),
-	FillDirectionMaxCells = 3,
+	CellSize = UDim2.fromOffset(154, 132),
+	FillDirectionMaxCells = 4,
 	SortOrder = Enum.SortOrder.LayoutOrder,
 }, inventoryFrame)
+new("UIPadding", {
+	PaddingTop = UDim.new(0, 12),
+	PaddingLeft = UDim.new(0, 12),
+	PaddingRight = UDim.new(0, 12),
+	PaddingBottom = UDim.new(0, 12),
+}, inventoryFrame)
+
+local detailsPanel = new("Frame", {
+	AnchorPoint = Vector2.new(1, 0),
+	BackgroundColor3 = Color3.fromRGB(26, 32, 38),
+	BackgroundTransparency = 0.02,
+	BorderSizePixel = 0,
+	Position = UDim2.new(1, -24, 0, 96),
+	Size = UDim2.new(0, 300, 1, -120),
+}, panel)
+new("UICorner", { CornerRadius = UDim.new(0, 18) }, detailsPanel)
+new("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 1, Transparency = 0.8 }, detailsPanel)
+
+local preview = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(90, 100, 106),
+	BorderSizePixel = 0,
+	Position = UDim2.fromOffset(18, 18),
+	Size = UDim2.fromOffset(64, 64),
+}, detailsPanel)
+new("UICorner", { CornerRadius = UDim.new(0, 16) }, preview)
+
+local detailTitle = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.fromOffset(94, 16),
+	Size = UDim2.new(1, -112, 0, 42),
+	Text = "Select a pet",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, detailsPanel)
+new("UITextSizeConstraint", { MaxTextSize = 20, MinTextSize = 10 }, detailTitle)
+
+local detailMeta = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	Position = UDim2.fromOffset(94, 58),
+	Size = UDim2.new(1, -112, 0, 24),
+	Text = "",
+	TextColor3 = Color3.fromRGB(190, 205, 212),
+	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, detailsPanel)
+new("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 8 }, detailMeta)
+
+local detailDescription = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamMedium,
+	Position = UDim2.fromOffset(18, 96),
+	Size = UDim2.new(1, -36, 0, 56),
+	Text = "Click a pet to inspect it.",
+	TextColor3 = Color3.fromRGB(205, 216, 222),
+	TextScaled = true,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+}, detailsPanel)
+new("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 8 }, detailDescription)
+
+local detailBuffs = new("TextLabel", {
+	BackgroundColor3 = Color3.fromRGB(16, 20, 24),
+	BackgroundTransparency = 0.18,
+	BorderSizePixel = 0,
+	Font = Enum.Font.GothamBold,
+	Position = UDim2.fromOffset(18, 164),
+	Size = UDim2.new(1, -36, 0, 76),
+	Text = "",
+	TextColor3 = Color3.fromRGB(230, 238, 242),
+	TextScaled = true,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Center,
+}, detailsPanel)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, detailBuffs)
+new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, detailBuffs)
+new("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 8 }, detailBuffs)
+
+local totalBuffs = new("TextLabel", {
+	AnchorPoint = Vector2.new(0, 1),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBold,
+	Position = UDim2.new(0, 18, 1, -162),
+	Size = UDim2.new(1, -36, 0, 58),
+	Text = "",
+	TextColor3 = Color3.fromRGB(202, 215, 222),
+	TextScaled = true,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Bottom,
+}, detailsPanel)
+new("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 8 }, totalBuffs)
+
+local equipButton = new("TextButton", {
+	AnchorPoint = Vector2.new(0, 1),
+	AutoButtonColor = true,
+	BackgroundColor3 = Color3.fromRGB(75, 121, 219),
+	BorderSizePixel = 0,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.new(0, 18, 1, -112),
+	Size = UDim2.new(1, -36, 0, 34),
+	Text = "Equip",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+}, detailsPanel)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, equipButton)
+new("UITextSizeConstraint", { MaxTextSize = 15, MinTextSize = 8 }, equipButton)
+
+local destroyButton = new("TextButton", {
+	AnchorPoint = Vector2.new(0, 1),
+	AutoButtonColor = true,
+	BackgroundColor3 = Color3.fromRGB(180, 76, 69),
+	BorderSizePixel = 0,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.new(0, 18, 1, -68),
+	Size = UDim2.new(0.48, -8, 0, 34),
+	Text = "Destroy",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+}, detailsPanel)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, destroyButton)
+new("UITextSizeConstraint", { MaxTextSize = 15, MinTextSize = 8 }, destroyButton)
+
+local fuseButton = new("TextButton", {
+	AnchorPoint = Vector2.new(1, 1),
+	AutoButtonColor = true,
+	BackgroundColor3 = Color3.fromRGB(227, 174, 67),
+	BorderSizePixel = 0,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.new(1, -18, 1, -68),
+	Size = UDim2.new(0.48, -8, 0, 34),
+	Text = "Fuse",
+	TextColor3 = Color3.fromRGB(31, 26, 16),
+	TextScaled = true,
+}, detailsPanel)
+new("UICorner", { CornerRadius = UDim.new(0, 12) }, fuseButton)
+new("UITextSizeConstraint", { MaxTextSize = 15, MinTextSize = 8 }, fuseButton)
+
+local messageTween = nil
+local function showMessage(text, color)
+	if messageTween then
+		messageTween:Cancel()
+	end
+
+	messageLabel.Text = text
+	messageLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+	messageLabel.TextTransparency = 0
+	messageLabel.BackgroundTransparency = 0.08
+	messageLabel.Visible = true
+	messageTween = TweenService:Create(messageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 1.5), {
+		TextTransparency = 1,
+		BackgroundTransparency = 1,
+	})
+	messageTween:Play()
+	messageTween.Completed:Connect(function()
+		if messageTween then
+			messageLabel.Visible = false
+			messageTween = nil
+		end
+	end)
+end
+
+local function getPetBuffText(petData)
+	local config = petData and getPetConfig(petData.PetId)
+	local buffs = config and config.Buffs or {}
+	local goldenMultiplier = (GameData.Pets and GameData.Pets.GoldenBuffMultiplier) or 1.5
+	local rows = {}
+	for _, buffName in ipairs({ "CashMultiplier", "DamageMultiplier", "BackpackMultiplier" }) do
+		local value = buffs[buffName]
+		if type(value) == "number" then
+			local finalValue = value
+			if petData.Variant == "Golden" then
+				finalValue = 1 + ((value - 1) * goldenMultiplier)
+			end
+			table.insert(rows, buffName:gsub("Multiplier", "") .. " " .. formatMultiplier(finalValue))
+		end
+	end
+	return #rows > 0 and table.concat(rows, "\n") or "No buff"
+end
+
+local function refreshDetails()
+	local petData = selectedPetUid and getPetByUid(selectedPetUid)
+	local equippedSet = getEquippedSet()
+	local buffs = currentPets.Buffs or {}
+	totalBuffs.Text = "Total Buffs: Cash " .. formatMultiplier(buffs.CashMultiplier)
+		.. " | Damage " .. formatMultiplier(buffs.DamageMultiplier)
+		.. " | Backpack " .. formatMultiplier(buffs.BackpackMultiplier)
+
+	if not petData then
+		preview.BackgroundColor3 = Color3.fromRGB(90, 100, 106)
+		detailTitle.Text = "Select a pet"
+		detailMeta.Text = ""
+		detailDescription.Text = "Click a pet to inspect it."
+		detailBuffs.Text = "Total buffs are shown below."
+		equipButton.Text = "Equip"
+		equipButton.AutoButtonColor = false
+		destroyButton.AutoButtonColor = false
+		fuseButton.AutoButtonColor = false
+		return
+	end
+
+	local config = getPetConfig(petData.PetId)
+	local rarityColor = config and getRarityColor(config.Rarity) or Color3.fromRGB(255, 255, 255)
+	local equipped = equippedSet[petData.Uid] == true
+	local normalCopies = countNormalCopies(petData.PetId)
+	preview.BackgroundColor3 = petData.Variant == "Golden" and Color3.fromRGB(255, 210, 60) or rarityColor
+	detailTitle.Text = getPetDisplayName(petData)
+	detailMeta.Text = (config and config.Rarity or "Unknown") .. " | " .. (petData.Variant or "Normal") .. " | " .. (equipped and "Equipped" or "Not Equipped")
+	detailMeta.TextColor3 = rarityColor
+	detailDescription.Text = config and config.Description or "A passive helper for your recycling empire."
+	detailBuffs.Text = getPetBuffText(petData)
+	equipButton.Text = equipped and "Unequip" or "Equip"
+	equipButton.AutoButtonColor = true
+	destroyButton.AutoButtonColor = true
+	fuseButton.AutoButtonColor = (petData.Variant ~= "Golden" and normalCopies >= 3)
+	fuseButton.BackgroundTransparency = fuseButton.AutoButtonColor and 0 or 0.55
+end
 
 local function clearInventory()
 	for _, child in ipairs(inventoryFrame:GetChildren()) do
-		if child ~= gridLayout then
+		if child ~= gridLayout and not child:IsA("UIPadding") then
 			child:Destroy()
 		end
 	end
 end
 
-local function setPetsSnapshot(snapshot)
-	if type(snapshot) ~= "table" then
-		return
-	end
-
-	currentPets.Inventory = type(snapshot.Inventory) == "table" and snapshot.Inventory or {}
-	currentPets.Equipped = type(snapshot.Equipped) == "table" and snapshot.Equipped or {}
-	currentPets.MaxEquipped = type(snapshot.MaxEquipped) == "number" and snapshot.MaxEquipped or currentPets.MaxEquipped
-	currentPets.Buffs = type(snapshot.Buffs) == "table" and snapshot.Buffs or currentPets.Buffs
-end
-
-local function refreshPets()
+local function refreshInventory()
 	clearInventory()
 	local equippedSet = getEquippedSet()
-	local equippedCount = #(currentPets.Equipped or {})
-	local maxEquipped = currentPets.MaxEquipped or 3
-	local buffs = currentPets.Buffs or {}
+	local inventory = currentPets.Inventory or {}
+	storageLabel.Text = "Storage " .. tostring(#inventory) .. "/" .. tostring(currentPets.MaxStorage or 30)
+	equippedLabel.Text = "Equipped " .. tostring(#(currentPets.Equipped or {})) .. "/" .. tostring(currentPets.MaxEquipped or 3)
 
-	equippedLabel.Text = "Equipped " .. tostring(equippedCount) .. "/" .. tostring(maxEquipped)
-	buffsLabel.Text = "Total buffs\nCash " .. formatMultiplier(buffs.CashMultiplier)
-		.. "\nDamage " .. formatMultiplier(buffs.DamageMultiplier)
-		.. "\nBackpack " .. formatMultiplier(buffs.BackpackMultiplier)
-
-	if #(currentPets.Inventory or {}) == 0 then
+	if #inventory == 0 then
 		local empty = new("TextLabel", {
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamBold,
-			Text = "No pets yet.",
+			Text = "No pets yet. Hatch at the Egg Plaza.",
 			TextColor3 = Color3.fromRGB(180, 194, 201),
 			TextScaled = true,
 		}, inventoryFrame)
-		new("UITextSizeConstraint", {
-			MaxTextSize = 18,
-			MinTextSize = 10,
-		}, empty)
+		new("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 10 }, empty)
+		refreshDetails()
 		return
 	end
 
-	for index, petData in ipairs(currentPets.Inventory) do
-		local petConfig = GameData.GetPet(petData.PetId)
-		local rarityColor = petConfig and getRarityColor(petConfig.Rarity) or Color3.fromRGB(255, 255, 255)
+	for index, petData in ipairs(inventory) do
+		local config = getPetConfig(petData.PetId)
+		local rarityColor = config and getRarityColor(config.Rarity) or Color3.fromRGB(255, 255, 255)
+		local selected = petData.Uid == selectedPetUid
 		local equipped = equippedSet[petData.Uid] == true
-		local card = new("Frame", {
-			BackgroundColor3 = equipped and Color3.fromRGB(36, 48, 42) or Color3.fromRGB(30, 37, 43),
+		local card = new("TextButton", {
+			AutoButtonColor = true,
+			BackgroundColor3 = selected and Color3.fromRGB(43, 52, 58) or Color3.fromRGB(29, 36, 42),
 			BackgroundTransparency = 0.02,
 			BorderSizePixel = 0,
 			LayoutOrder = index,
+			Text = "",
 		}, inventoryFrame)
-		new("UICorner", { CornerRadius = UDim.new(0, 16) }, card)
+		new("UICorner", { CornerRadius = UDim.new(0, 15) }, card)
 		new("UIStroke", {
-			Color = rarityColor,
-			Thickness = equipped and 2.2 or 1.2,
-			Transparency = equipped and 0.05 or 0.34,
+			Color = petData.Variant == "Golden" and Color3.fromRGB(255, 210, 60) or rarityColor,
+			Thickness = selected and 2.4 or (equipped and 2 or 1.2),
+			Transparency = selected and 0 or 0.28,
 		}, card)
+
+		local swatch = new("Frame", {
+			BackgroundColor3 = petData.Variant == "Golden" and Color3.fromRGB(255, 210, 60) or rarityColor,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(12, 12),
+			Size = UDim2.fromOffset(42, 42),
+		}, card)
+		new("UICorner", { CornerRadius = UDim.new(0, 12) }, swatch)
 
 		local name = new("TextLabel", {
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamBlack,
-			Position = UDim2.fromOffset(12, 10),
-			Size = UDim2.new(1, -24, 0, 32),
-			Text = petConfig and petConfig.Name or petData.PetId,
+			Position = UDim2.fromOffset(62, 10),
+			Size = UDim2.new(1, -72, 0, 42),
+			Text = getPetDisplayName(petData),
+			TextColor3 = Color3.fromRGB(255, 255, 255),
+			TextScaled = true,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+		}, card)
+		new("UITextSizeConstraint", { MaxTextSize = 15, MinTextSize = 8 }, name)
+
+		local meta = new("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			Position = UDim2.fromOffset(12, 66),
+			Size = UDim2.new(1, -24, 0, 24),
+			Text = (config and config.Rarity or "Unknown") .. (equipped and " | Equipped" or ""),
 			TextColor3 = rarityColor,
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 		}, card)
-		new("UITextSizeConstraint", {
-			MaxTextSize = 17,
-			MinTextSize = 9,
-		}, name)
+		new("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 8 }, meta)
 
-		local rarity = new("TextLabel", {
-			BackgroundTransparency = 1,
-			Font = Enum.Font.GothamBold,
-			Position = UDim2.fromOffset(12, 42),
-			Size = UDim2.new(1, -24, 0, 24),
-			Text = petConfig and petConfig.Rarity or "Unknown",
-			TextColor3 = Color3.fromRGB(205, 216, 222),
-			TextScaled = true,
-			TextXAlignment = Enum.TextXAlignment.Left,
-		}, card)
-		new("UITextSizeConstraint", {
-			MaxTextSize = 13,
-			MinTextSize = 8,
-		}, rarity)
-
-		local action = new("TextButton", {
-			AutoButtonColor = true,
-			BackgroundColor3 = equipped and Color3.fromRGB(95, 103, 108) or Color3.fromRGB(75, 121, 219),
-			BorderSizePixel = 0,
-			Font = Enum.Font.GothamBlack,
-			Position = UDim2.new(0, 12, 1, -42),
-			Size = UDim2.new(1, -24, 0, 30),
-			Text = equipped and "Unequip" or "Equip",
-			TextColor3 = Color3.fromRGB(255, 255, 255),
-			TextScaled = true,
-		}, card)
-		new("UICorner", { CornerRadius = UDim.new(0, 10) }, action)
-		new("UITextSizeConstraint", {
-			MaxTextSize = 14,
-			MinTextSize = 8,
-		}, action)
-
-		action.Activated:Connect(function()
-			local remote = equipped and unequipPetRemote or equipPetRemote
-			local ok, response = pcall(function()
-				return remote:InvokeServer(petData.Uid)
-			end)
-
-			if ok and type(response) == "table" then
-				if response.Pets then
-					setPetsSnapshot(response.Pets)
-				end
-				if not response.Ok and SoundUtil then
-					SoundUtil.Play("Error", GameData, playerGui)
-				end
-				if response.Reason == "MaxEquipped" then
-					hatchResult.Text = "You can only equip " .. tostring(maxEquipped) .. " pets."
-					hatchResult.TextColor3 = Color3.fromRGB(255, 190, 135)
-				end
-				refreshPets()
-			else
-				warn("[PetClient] Pet equip request failed:", response)
-			end
+		card.Activated:Connect(function()
+			selectedPetUid = petData.Uid
+			refreshInventory()
 		end)
 	end
+
+	refreshDetails()
+end
+
+local function refreshEggOverlay()
+	if not eggOverlayGui then
+		return
+	end
+
+	local listFrame = eggOverlayGui:FindFirstChild("List", true)
+	if not listFrame then
+		return
+	end
+
+	for _, child in ipairs(listFrame:GetChildren()) do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+
+	local eggConfig = GameData.GetEgg(STARTER_EGG_ID)
+	if not eggConfig then
+		return
+	end
+
+	for index, petConfig in ipairs(eggConfig.Pets) do
+		local discovered = currentPets.Discovered and currentPets.Discovered[petConfig.PetId] == true
+		local color = discovered and getRarityColor(petConfig.Rarity) or Color3.fromRGB(95, 101, 106)
+		local row = new("Frame", {
+			BackgroundColor3 = Color3.fromRGB(18, 22, 26),
+			BackgroundTransparency = 0.15,
+			BorderSizePixel = 0,
+			LayoutOrder = index,
+			Size = UDim2.new(1, 0, 0, 24),
+		}, listFrame)
+		new("UICorner", { CornerRadius = UDim.new(0, 8) }, row)
+
+		local dot = new("Frame", {
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(8, 7),
+			Size = UDim2.fromOffset(10, 10),
+		}, row)
+		new("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
+
+		local label = new("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBold,
+			Position = UDim2.fromOffset(24, 2),
+			Size = UDim2.new(1, -72, 1, -4),
+			Text = discovered and petConfig.Name or "???",
+			TextColor3 = discovered and Color3.fromRGB(240, 246, 248) or Color3.fromRGB(145, 153, 158),
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+		}, row)
+		new("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 7 }, label)
+
+		local chance = new("TextLabel", {
+			BackgroundTransparency = 1,
+			Font = Enum.Font.GothamBlack,
+			Position = UDim2.new(1, -46, 2 / 24, 0),
+			Size = UDim2.fromOffset(38, 20),
+			Text = tostring(petConfig.Chance) .. "%",
+			TextColor3 = color,
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		}, row)
+		new("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 7 }, chance)
+	end
+end
+
+local function refreshAll()
+	refreshInventory()
+	refreshEggOverlay()
 end
 
 local openTween = nil
-local function openPets()
+local function openInventory()
 	if openTween then
 		openTween:Cancel()
 	end
-
 	overlay.Visible = true
 	panelScale.Scale = 0.88
-	refreshPets()
-	openTween = TweenService:Create(panelScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Scale = 1,
-	})
+	refreshAll()
+	openTween = TweenService:Create(panelScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 	openTween:Play()
 end
 
-local function closePets()
+local function closeInventory()
 	if openTween then
 		openTween:Cancel()
 	end
-
-	local tween = TweenService:Create(panelScale, TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-		Scale = 0.9,
-	})
+	local tween = TweenService:Create(panelScale, TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 0.9 })
 	tween:Play()
 	tween.Completed:Connect(function()
 		overlay.Visible = false
 	end)
 end
 
-local hatching = false
-hatchButton.Activated:Connect(function()
-	if hatching then
-		return
-	end
-
-	hatching = true
-	hatchButton.Text = "Hatching..."
-	local ok, response = pcall(function()
-		return hatchEggRemote:InvokeServer(STARTER_EGG_ID)
-	end)
-	hatchButton.Text = "Hatch"
-	hatching = false
-
-	if not ok or type(response) ~= "table" then
-		warn("[PetClient] Hatch request failed:", response)
-		hatchResult.Text = "Hatch failed."
-		hatchResult.TextColor3 = Color3.fromRGB(255, 177, 137)
-		if SoundUtil then
-			SoundUtil.Play("Error", GameData, playerGui)
-		end
-		return
-	end
-
+local function handlePetAction(response, successMessage)
 	if response.Pets then
 		setPetsSnapshot(response.Pets)
 	end
-
-	if response.Ok then
-		local petConfig = response.PetConfig or (response.Pet and GameData.GetPet(response.Pet.PetId))
-		local petName = petConfig and petConfig.Name or "a pet"
-		local rarity = petConfig and petConfig.Rarity or "Common"
-		hatchResult.Text = "Hatched " .. petName .. "!"
-		hatchResult.TextColor3 = getRarityColor(rarity)
-		if SoundUtil then
-			SoundUtil.Play("Coin", GameData, playerGui)
-		end
+	if response.Success or response.Ok then
+		showMessage(successMessage or "OK", Color3.fromRGB(136, 255, 164))
 	else
-		local message = "Could not hatch."
-		if response.Reason == "NotEnoughCash" then
-			message = "Not enough Cash."
-		elseif response.Reason == "UnknownEgg" then
-			message = "Egg is not configured."
-		end
-		hatchResult.Text = message
-		hatchResult.TextColor3 = Color3.fromRGB(255, 177, 137)
+		local reason = response.Error or response.Reason
+		showMessage(getErrorMessage(reason), Color3.fromRGB(255, 177, 137))
 		if SoundUtil then
 			SoundUtil.Play("Error", GameData, playerGui)
 		end
 	end
+	refreshAll()
+end
 
-	refreshPets()
+equipButton.Activated:Connect(function()
+	local petData = selectedPetUid and getPetByUid(selectedPetUid)
+	if not petData then
+		return
+	end
+	local equipped = getEquippedSet()[petData.Uid] == true
+	local response = invokePetRemote(equipped and unequipPetRemote or equipPetRemote, petData.Uid)
+	handlePetAction(response, equipped and "Pet desequipe." or "Pet equipe.")
 end)
 
-openButton.Activated:Connect(openPets)
-closeButton.Activated:Connect(closePets)
+destroyButton.Activated:Connect(function()
+	local petData = selectedPetUid and getPetByUid(selectedPetUid)
+	if not petData then
+		return
+	end
+	local response = invokePetRemote(destroyPetRemote, petData.Uid)
+	handlePetAction(response, "Pet detruit.")
+end)
+
+fuseButton.Activated:Connect(function()
+	local petData = selectedPetUid and getPetByUid(selectedPetUid)
+	if not petData then
+		return
+	end
+	local response = invokePetRemote(fusePetRemote, petData.Uid)
+	handlePetAction(response, "Fusion reussie.")
+end)
+
+inventoryButton.Activated:Connect(function()
+	if overlay.Visible then
+		closeInventory()
+	else
+		openInventory()
+	end
+end)
+closeButton.Activated:Connect(closeInventory)
+
+local hatchGui = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(6, 8, 11),
+	BackgroundTransparency = 0.08,
+	BorderSizePixel = 0,
+	Size = UDim2.fromScale(1, 1),
+	Visible = false,
+	ZIndex = 20,
+}, gui)
+new("UIGradient", {
+	Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 20, 25)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 8, 11)),
+	}),
+	Rotation = 90,
+}, hatchGui)
+
+local hatchEgg = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = Color3.fromRGB(255, 226, 112),
+	BorderSizePixel = 0,
+	Position = UDim2.fromScale(0.5, 0.45),
+	Size = UDim2.fromOffset(120, 150),
+	ZIndex = 21,
+}, hatchGui)
+new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, hatchEgg)
+
+local hatchReveal = new("TextLabel", {
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBlack,
+	Position = UDim2.fromScale(0.5, 0.62),
+	Size = UDim2.fromOffset(420, 90),
+	Text = "",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+	TextWrapped = true,
+	ZIndex = 21,
+}, hatchGui)
+new("UITextSizeConstraint", { MaxTextSize = 34, MinTextSize = 14 }, hatchReveal)
+
+local function playHatchAnimation(response)
+	local petData = response.Pet
+	local petConfig = response.PetConfig or (petData and getPetConfig(petData.PetId))
+	local rarityColor = petConfig and getRarityColor(petConfig.Rarity) or Color3.fromRGB(255, 255, 255)
+	hatchGui.Visible = true
+	hatchReveal.Text = ""
+	hatchEgg.BackgroundColor3 = Color3.fromRGB(255, 226, 112)
+	hatchEgg.Size = UDim2.fromOffset(120, 150)
+	hatchEgg.Rotation = 0
+
+	for index = 1, 6 do
+		local rotation = index % 2 == 0 and 12 or -12
+		local tween = TweenService:Create(hatchEgg, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+			Rotation = rotation,
+		})
+		tween:Play()
+		tween.Completed:Wait()
+	end
+
+	local flash = TweenService:Create(hatchEgg, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Rotation = 0,
+		Size = UDim2.fromOffset(180, 210),
+		BackgroundColor3 = rarityColor,
+	})
+	flash:Play()
+	flash.Completed:Wait()
+
+	hatchReveal.TextColor3 = rarityColor
+	hatchReveal.Text = "Hatched\n" .. (petData and getPetDisplayName(petData) or (petConfig and petConfig.Name) or "Pet")
+	task.wait(1.35)
+	hatchGui.Visible = false
+end
+
+local hatching = false
+local function requestHatch()
+	if hatching then
+		return
+	end
+	hatching = true
+	local response = invokePetRemote(hatchEggRemote, STARTER_EGG_ID)
+	hatching = false
+	if response.Success or response.Ok then
+		if SoundUtil then
+			SoundUtil.Play("Coin", GameData, playerGui)
+		end
+		task.spawn(playHatchAnimation, response)
+	else
+		local reason = response.Error or response.Reason
+		showMessage(getErrorMessage(reason), Color3.fromRGB(255, 177, 137))
+		if SoundUtil then
+			SoundUtil.Play("Error", GameData, playerGui)
+		end
+	end
+	refreshAll()
+end
+
+local function getHatcherPart(instance)
+	if not instance then
+		return nil
+	end
+	if instance:IsA("BasePart") then
+		return instance
+	end
+	if instance:IsA("Model") then
+		local main = instance:FindFirstChild("Main", true)
+		if main and main:IsA("BasePart") then
+			return main
+		end
+		if instance.PrimaryPart then
+			return instance.PrimaryPart
+		end
+		for _, descendant in ipairs(instance:GetDescendants()) do
+			if descendant:IsA("BasePart") then
+				return descendant
+			end
+		end
+	end
+	return nil
+end
+
+local function findEggHatcher()
+	local plaza = Workspace:FindFirstChild("EggPlaza")
+	local hatcher = plaza and plaza:FindFirstChild("EggHatcher")
+	return hatcher or Workspace:FindFirstChild("EggHatcher")
+end
+
+local function createEggOverlay(part)
+	if eggOverlayGui then
+		eggOverlayGui:Destroy()
+	end
+
+	local eggConfig = GameData.GetEgg(STARTER_EGG_ID)
+	eggOverlayGui = new("BillboardGui", {
+		Name = "GEIEggOverlay",
+		Adornee = part,
+		AlwaysOnTop = true,
+		MaxDistance = 45,
+		Size = UDim2.fromOffset(250, 238),
+		StudsOffset = Vector3.new(0, 5, 0),
+	}, part)
+
+	local frame = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(18, 22, 26),
+		BackgroundTransparency = 0.1,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+	}, eggOverlayGui)
+	new("UICorner", { CornerRadius = UDim.new(0, 16) }, frame)
+	new("UIStroke", { Color = Color3.fromRGB(255, 226, 112), Thickness = 1.5, Transparency = 0.2 }, frame)
+
+	local header = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBlack,
+		Position = UDim2.fromOffset(12, 8),
+		Size = UDim2.new(1, -24, 0, 28),
+		Text = eggConfig and eggConfig.DisplayName or "Starter Egg",
+		TextColor3 = Color3.fromRGB(255, 226, 112),
+		TextScaled = true,
+	}, frame)
+	new("UITextSizeConstraint", { MaxTextSize = 19, MinTextSize = 10 }, header)
+
+	local price = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		Position = UDim2.fromOffset(12, 38),
+		Size = UDim2.new(1, -24, 0, 22),
+		Text = eggConfig and ("Price: " .. formatNumber(eggConfig.Price) .. " Cash") or "Unavailable",
+		TextColor3 = Color3.fromRGB(180, 238, 184),
+		TextScaled = true,
+	}, frame)
+	new("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 8 }, price)
+
+	local listFrame = new("Frame", {
+		Name = "List",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(12, 68),
+		Size = UDim2.new(1, -24, 1, -80),
+	}, frame)
+	new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }, listFrame)
+	refreshEggOverlay()
+end
+
+local function setupEggHatcher()
+	local hatcher = findEggHatcher()
+	local hatcherPart = getHatcherPart(hatcher)
+	if not hatcherPart then
+		if not eggWarningShown then
+			eggWarningShown = true
+			warn("[PetClient] Missing Workspace.EggPlaza.EggHatcher. Create EggPlaza > EggHatcher to enable map hatching.")
+		end
+		return
+	end
+
+	createEggOverlay(hatcherPart)
+	local prompt = hatcherPart:FindFirstChild("GEIEggPrompt")
+	if prompt and not prompt:IsA("ProximityPrompt") then
+		prompt:Destroy()
+		prompt = nil
+	end
+	if not prompt then
+		prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "GEIEggPrompt"
+		prompt.ActionText = "Hatch"
+		prompt.ObjectText = "Starter Egg"
+		prompt.KeyboardKeyCode = Enum.KeyCode.E
+		prompt.HoldDuration = 0
+		prompt.MaxActivationDistance = 12
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = hatcherPart
+	end
+	if not eggPromptConnected then
+		eggPromptConnected = true
+		prompt.Triggered:Connect(function(triggeringPlayer)
+			if triggeringPlayer == nil or triggeringPlayer == player then
+				requestHatch()
+			end
+		end)
+	end
+end
+
+local function setFollowerPartProperties(instance, golden)
+	if instance:IsA("BasePart") then
+		instance.Anchored = true
+		instance.CanCollide = false
+		instance.CanTouch = false
+		instance.CanQuery = false
+		instance.Massless = true
+		if golden then
+			instance.Color = Color3.fromRGB(255, 210, 60)
+		end
+	end
+	for _, descendant in ipairs(instance:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			descendant.CanTouch = false
+			descendant.CanQuery = false
+			descendant.Massless = true
+			if golden then
+				descendant.Color = Color3.fromRGB(255, 210, 60)
+			end
+		end
+	end
+end
+
+local function getPetModelSource(petData)
+	local folder = ReplicatedStorage:FindFirstChild("PetModels")
+	if not folder then
+		return nil
+	end
+	local goldenName = "Golden" .. petData.PetId
+	if petData.Variant == "Golden" and folder:FindFirstChild(goldenName) then
+		return folder:FindFirstChild(goldenName), false
+	end
+	return folder:FindFirstChild(petData.PetId), petData.Variant == "Golden"
+end
+
+local function createFallbackPetVisual(petData)
+	local config = getPetConfig(petData.PetId)
+	local model = Instance.new("Model")
+	model.Name = "PetFollower_" .. petData.Uid
+	local part = Instance.new("Part")
+	part.Name = "Main"
+	part.Shape = Enum.PartType.Ball
+	part.Size = Vector3.new(1.2, 1.2, 1.2)
+	part.Material = Enum.Material.SmoothPlastic
+	part.Color = petData.Variant == "Golden" and Color3.fromRGB(255, 210, 60) or (config and getRarityColor(config.Rarity) or Color3.fromRGB(180, 190, 195))
+	part.Parent = model
+	model.PrimaryPart = part
+	return model
+end
+
+local function clonePetVisual(petData)
+	local source, forceGoldenColor = getPetModelSource(petData)
+	local visual
+	if source then
+		if source:IsA("Model") then
+			visual = source:Clone()
+		elseif source:IsA("Folder") then
+			visual = Instance.new("Model")
+			local sourceClone = source:Clone()
+			for _, child in ipairs(sourceClone:GetChildren()) do
+				child.Parent = visual
+			end
+			sourceClone:Destroy()
+		elseif source:IsA("BasePart") then
+			visual = Instance.new("Model")
+			local partClone = source:Clone()
+			partClone.Parent = visual
+		end
+	end
+
+	if not visual then
+		visual = createFallbackPetVisual(petData)
+	end
+
+	visual.Name = "PetFollower_" .. petData.Uid
+	setFollowerPartProperties(visual, forceGoldenColor == true)
+	local main = visual:FindFirstChild("Main", true)
+	if main and main:IsA("BasePart") then
+		visual.PrimaryPart = main
+	elseif not visual.PrimaryPart then
+		for _, descendant in ipairs(visual:GetDescendants()) do
+			if descendant:IsA("BasePart") then
+				visual.PrimaryPart = descendant
+				break
+			end
+		end
+	end
+	visual.Parent = Workspace
+	return visual
+end
+
+local function clearFollowers()
+	for _, visual in pairs(followerModels) do
+		if visual and visual.Parent then
+			visual:Destroy()
+		end
+	end
+	followerModels = {}
+end
+
+local function rebuildFollowers()
+	clearFollowers()
+	local equippedSet = getEquippedSet()
+	for _, petData in ipairs(currentPets.Inventory or {}) do
+		if equippedSet[petData.Uid] then
+			followerModels[petData.Uid] = clonePetVisual(petData)
+		end
+	end
+end
+
+RunService.RenderStepped:Connect(function(deltaTime)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+
+	local equippedSet = getEquippedSet()
+	local petIndex = 0
+	for _, petData in ipairs(currentPets.Inventory or {}) do
+		local visual = followerModels[petData.Uid]
+		if equippedSet[petData.Uid] and visual and visual.PrimaryPart then
+			petIndex += 1
+			local offset = FOLLOW_OFFSETS[petIndex] or Vector3.new(0, 2, 4 + petIndex)
+			local bob = math.sin(os.clock() * 3 + petIndex) * 0.18
+			local target = root.CFrame * CFrame.new(offset + Vector3.new(0, bob, 0))
+			local current = visual:GetPivot()
+			visual:PivotTo(current:Lerp(target, math.clamp(deltaTime * 8, 0, 1)))
+		end
+	end
+end)
 
 petInventoryUpdatedRemote.OnClientEvent:Connect(function(snapshot)
 	setPetsSnapshot(snapshot)
-	refreshPets()
+	refreshAll()
+	rebuildFollowers()
 end)
 
 if playerDataRemote then
 	playerDataRemote.OnClientEvent:Connect(function(snapshot)
 		if type(snapshot) == "table" and type(snapshot.Pets) == "table" then
 			setPetsSnapshot(snapshot.Pets)
-			refreshPets()
+			refreshAll()
+			rebuildFollowers()
 		end
 	end)
 end
 
-local eggZoneWarned = false
-local function setupEggZonePrompt(zone)
-	if not zone then
-		if not eggZoneWarned then
-			eggZoneWarned = true
-			warn("[PetClient] Optional Workspace.EggZone missing. You can still open Eggs from the UI button.")
-		end
-		return
-	end
+player.CharacterAdded:Connect(function()
+	task.wait(0.25)
+	rebuildFollowers()
+end)
 
-	if not zone:IsA("BasePart") then
-		if not eggZoneWarned then
-			eggZoneWarned = true
-			warn("[PetClient] Workspace.EggZone exists but should be a BasePart for the egg prompt.")
-		end
-		return
-	end
-
-	local prompt = zone:FindFirstChild("GEIEggPrompt")
-	if prompt and not prompt:IsA("ProximityPrompt") then
-		prompt:Destroy()
-		prompt = nil
-	end
-
-	if not prompt then
-		prompt = Instance.new("ProximityPrompt")
-		prompt.Name = "GEIEggPrompt"
-		prompt.ActionText = "Open Eggs"
-		prompt.ObjectText = "Starter Egg"
-		prompt.KeyboardKeyCode = Enum.KeyCode.E
-		prompt.MaxActivationDistance = 12
-		prompt.RequiresLineOfSight = false
-		prompt.Parent = zone
-	end
-
-	prompt.Triggered:Connect(openPets)
-end
-
-setupEggZonePrompt(Workspace:FindFirstChild("EggZone"))
 Workspace.ChildAdded:Connect(function(child)
-	if child.Name == "EggZone" then
-		task.defer(setupEggZonePrompt, child)
+	if child.Name == "EggPlaza" or child.Name == "EggHatcher" then
+		task.defer(setupEggHatcher)
 	end
 end)
 
-refreshPets()
+local petErrorRemote = remotes:WaitForChild("PetError", 20)
+if petErrorRemote then
+	petErrorRemote.OnClientEvent:Connect(function(reason, snapshot)
+		if snapshot then
+			setPetsSnapshot(snapshot)
+		end
+		showMessage(getErrorMessage(reason), Color3.fromRGB(255, 177, 137))
+		refreshAll()
+	end)
+end
+
+setupEggHatcher()
+refreshAll()

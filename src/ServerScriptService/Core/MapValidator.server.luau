@@ -55,6 +55,8 @@ local REQUIREMENTS = {
 
 local OPTIONAL_REQUIREMENTS = {
 	"EggZone",
+	"EggPlaza",
+	"EggHatcher",
 	"VIPZone",
 	"Zone2Barrier",
 	"SpawnSurface2",

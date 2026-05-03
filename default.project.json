@@ -27,6 +27,10 @@
         "$path": "src/ReplicatedStorage/WasteModels",
         "$ignoreUnknownInstances": true
       },
+      "PetModels": {
+        "$path": "src/ReplicatedStorage/PetModels",
+        "$ignoreUnknownInstances": true
+      },
       "Sounds": {
         "$path": "src/ReplicatedStorage/Sounds",
         "$ignoreUnknownInstances": true
