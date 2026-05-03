@@ -35,6 +35,7 @@ if not requestAttackRemote or not playerData then
 end
 
 local localCooldownUntil = 0
+local isPrimaryAttackDown = false
 local activeGripTweens = {}
 
 local function getRootPart()
@@ -347,6 +348,7 @@ local function requestAttack()
 
 	local target = findTarget()
 	if not target then
+		localCooldownUntil = now + 0.05
 		return
 	end
 
@@ -362,7 +364,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isPrimaryAttackDown = true
 		requestAttack()
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input, _gameProcessed)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isPrimaryAttackDown = false
 	end
 end)
 
@@ -378,6 +387,10 @@ if attackFeedbackRemote then
 end
 
 RunService.RenderStepped:Connect(function()
+	if isPrimaryAttackDown then
+		requestAttack()
+	end
+
 	local root = getRootPart()
 	local wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
 	if not root or not wasteZone then
