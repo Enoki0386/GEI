@@ -16,10 +16,8 @@ local GameData = require(gameDataModule)
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 20)
 local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 20)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
-local assetIdsModule = sharedFolder and sharedFolder:WaitForChild("AssetIds", 20)
-local currencyIconUtilModule = sharedFolder and sharedFolder:WaitForChild("CurrencyIconUtil", 20)
-local AssetIds = assetIdsModule and require(assetIdsModule)
-local CurrencyIconUtil = currencyIconUtilModule and require(currencyIconUtilModule)
+local uiIconUtilsModule = sharedFolder and sharedFolder:WaitForChild("UIIconUtils", 20)
+local UIIconUtils = uiIconUtilsModule and require(uiIconUtilsModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then
 	warn("[PetClient] Missing ReplicatedStorage.Remotes. Pet UI disabled.")
@@ -960,8 +958,8 @@ local function createEggOverlay(part)
 	new("UITextSizeConstraint", { MaxTextSize = 19, MinTextSize = 10 }, header)
 
 	local priceCurrency = eggConfig and (eggConfig.Currency or "Cash") or "Cash"
-	local priceIconId = CurrencyIconUtil and CurrencyIconUtil.GetCurrencyIcon(AssetIds, priceCurrency)
-	local hasPriceIcon = eggConfig ~= nil and priceIconId ~= nil
+	local priceIconId = UIIconUtils and UIIconUtils.GetCurrencyIcon(priceCurrency)
+	local hasPriceIcon = eggConfig ~= nil and priceIconId ~= nil and priceIconId ~= ""
 	local priceIcon = new("ImageLabel", {
 		BackgroundTransparency = 1,
 		Image = "",

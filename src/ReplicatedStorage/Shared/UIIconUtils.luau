@@ -1,11 +1,14 @@
-local CurrencyIconUtil = {}
+local AssetIds = require(script.Parent:WaitForChild("AssetIds"))
+
+local UIIconUtils = {}
 
 local CURRENCY_ALIASES = {
 	Cash = "Coin",
-	Coins = "Coin",
 	Coin = "Coin",
+	Coins = "Coin",
 	Diamond = "Diamond",
 	Diamonds = "Diamond",
+	Trash = "Waste",
 	Waste = "Waste",
 }
 
@@ -16,28 +19,27 @@ local function isUsableImageId(imageId)
 		and imageId ~= "rbxassetid://0"
 end
 
-function CurrencyIconUtil.GetCurrencyIcon(assetIds, currencyName)
-	local icons = assetIds and assetIds.Icons
-	if type(icons) ~= "table" or type(currencyName) ~= "string" then
-		return nil
+function UIIconUtils.GetCurrencyIcon(currencyName)
+	if type(currencyName) ~= "string" then
+		return ""
 	end
 
 	local iconName = CURRENCY_ALIASES[currencyName] or currencyName
-	local imageId = icons[iconName]
+	local imageId = AssetIds.Icons and AssetIds.Icons[iconName]
 	if isUsableImageId(imageId) then
 		return imageId
 	end
 
-	return nil
+	return ""
 end
 
-function CurrencyIconUtil.ApplyToImage(imageLabel, assetIds, currencyName)
-	if not imageLabel then
+function UIIconUtils.ApplyCurrencyIcon(imageLabel, currencyName)
+	if not imageLabel or not (imageLabel:IsA("ImageLabel") or imageLabel:IsA("ImageButton")) then
 		return false
 	end
 
-	local imageId = CurrencyIconUtil.GetCurrencyIcon(assetIds, currencyName)
-	if imageId then
+	local imageId = UIIconUtils.GetCurrencyIcon(currencyName)
+	if imageId ~= "" then
 		imageLabel.Image = imageId
 		imageLabel.Visible = true
 		return true
@@ -48,4 +50,4 @@ function CurrencyIconUtil.ApplyToImage(imageLabel, assetIds, currencyName)
 	return false
 end
 
-return CurrencyIconUtil
+return UIIconUtils

@@ -13,10 +13,8 @@ local GameData = require(gameDataModule)
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
 local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 10)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
-local assetIdsModule = sharedFolder and sharedFolder:WaitForChild("AssetIds", 10)
-local currencyIconUtilModule = sharedFolder and sharedFolder:WaitForChild("CurrencyIconUtil", 10)
-local AssetIds = assetIdsModule and require(assetIdsModule)
-local CurrencyIconUtil = currencyIconUtilModule and require(currencyIconUtilModule)
+local uiIconUtilsModule = sharedFolder and sharedFolder:WaitForChild("UIIconUtils", 10)
+local UIIconUtils = uiIconUtilsModule and require(uiIconUtilsModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ShopClient stopped.")
@@ -389,7 +387,7 @@ local function addDetailRow(labelText, valueText, layoutOrder, currencyName)
 		Size = UDim2.fromOffset(18, 18),
 		Visible = false,
 	}, row)
-	local hasIcon = CurrencyIconUtil and CurrencyIconUtil.ApplyToImage(icon, AssetIds, currencyName)
+	local hasIcon = UIIconUtils and UIIconUtils.ApplyCurrencyIcon(icon, currencyName)
 
 	local value = new("TextLabel", {
 		BackgroundTransparency = 1,
@@ -528,8 +526,8 @@ local function createItemCard(category, itemId, config, layoutOrder)
 		MinTextSize = 8,
 	}, stats)
 
-	local priceIconId = CurrencyIconUtil and CurrencyIconUtil.GetCurrencyIcon(AssetIds, "Cash")
-	local priceHasIcon = config.Price > 0 and priceIconId ~= nil
+	local priceIconId = UIIconUtils and UIIconUtils.GetCurrencyIcon("Cash")
+	local priceHasIcon = config.Price > 0 and priceIconId ~= nil and priceIconId ~= ""
 	local priceIcon = new("ImageLabel", {
 		BackgroundTransparency = 1,
 		Image = "",

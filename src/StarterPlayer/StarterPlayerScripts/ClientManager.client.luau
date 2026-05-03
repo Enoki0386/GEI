@@ -19,10 +19,8 @@ local GameData = require(gameDataModule)
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 20)
 local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 20)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
-local assetIdsModule = sharedFolder and sharedFolder:WaitForChild("AssetIds", 20)
-local currencyIconUtilModule = sharedFolder and sharedFolder:WaitForChild("CurrencyIconUtil", 20)
-local AssetIds = assetIdsModule and require(assetIdsModule)
-local CurrencyIconUtil = currencyIconUtilModule and require(currencyIconUtilModule)
+local uiIconUtilsModule = sharedFolder and sharedFolder:WaitForChild("UIIconUtils", 20)
+local UIIconUtils = uiIconUtilsModule and require(uiIconUtilsModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ClientManager stopped.")
@@ -147,7 +145,7 @@ local function createStatPill(name, title, color, layoutOrder, currencyName)
 		Size = UDim2.fromOffset(20, 20),
 		Visible = false,
 	}, pill)
-	local hasIcon = CurrencyIconUtil and CurrencyIconUtil.ApplyToImage(icon, AssetIds, currencyName)
+	local hasIcon = UIIconUtils and UIIconUtils.ApplyCurrencyIcon(icon, currencyName)
 	if hasIcon then
 		accent.Visible = false
 	end

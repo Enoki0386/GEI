@@ -1,8 +1,8 @@
 local AssetIds = {}
 
 AssetIds.Icons = {
-	Coin = "",
-	Diamond = "",
+	Coin = "", -- Exemple: "rbxassetid://ID_COIN"
+	Diamond = "", -- Exemple: "rbxassetid://ID_DIAMOND"
 	Waste = "",
 }
 
