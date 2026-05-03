@@ -7,11 +7,11 @@ local TweenService = game:GetService("TweenService")
 ReplicatedFirst:RemoveDefaultLoadingScreen()
 
 local player = Players.LocalPlayer
-local TIMEOUTS = {
-	Core = 15,
-	PlayerData = 20,
-	HUD = 25,
-}
+
+local MAX_LOADING_SECONDS = 8
+local PLAYER_GUI_TIMEOUT = 5
+local FADE_SECONDS = 0.35
+local startedAt = os.clock()
 
 local function new(className, properties, parent)
 	local instance = Instance.new(className)
@@ -22,12 +22,38 @@ local function new(className, properties, parent)
 	return instance
 end
 
-local playerGui = player:WaitForChild("PlayerGui", TIMEOUTS.Core)
+local function tween(instance, tweenInfo, goals)
+	local createdTween = TweenService:Create(instance, tweenInfo, goals)
+	createdTween:Play()
+	return createdTween
+end
+
+local playerGui = player:WaitForChild("PlayerGui", PLAYER_GUI_TIMEOUT)
 local gui = nil
+local statusLabel = nil
+local progressFill = nil
+local percentLabel = nil
+
+local function setStatus(text, progress)
+	if statusLabel then
+		statusLabel.Text = text
+	end
+
+	local clampedProgress = math.clamp(progress or 0, 0, 1)
+	if percentLabel then
+		percentLabel.Text = tostring(math.floor(clampedProgress * 100)) .. "%"
+	end
+
+	if progressFill then
+		tween(progressFill, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.fromScale(clampedProgress, 1),
+		})
+	end
+end
 
 if playerGui then
 	gui = new("ScreenGui", {
-		Name = "GEILoading",
+		Name = "GarbageEmpireLoading",
 		DisplayOrder = 1000,
 		IgnoreGuiInset = true,
 		ResetOnSpawn = false,
@@ -35,7 +61,8 @@ if playerGui then
 	}, playerGui)
 
 	local background = new("Frame", {
-		BackgroundColor3 = Color3.fromRGB(11, 15, 18),
+		BackgroundColor3 = Color3.fromRGB(8, 11, 14),
+		BackgroundTransparency = 0.04,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
 	}, gui)
@@ -43,59 +70,117 @@ if playerGui then
 	new("UIGradient", {
 		Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 24, 29)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 11, 14)),
+			ColorSequenceKeypoint.new(0.55, Color3.fromRGB(10, 14, 18)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 8, 11)),
 		}),
 		Rotation = 90,
 	}, background)
 
-	local label = new("TextLabel", {
+	local panel = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(18, 23, 28),
+		BackgroundTransparency = 0.18,
+		BorderSizePixel = 0,
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(430, 214),
+	}, background)
+	new("UICorner", { CornerRadius = UDim.new(0, 22) }, panel)
+	new("UIStroke", {
+		Color = Color3.fromRGB(92, 232, 152),
+		Thickness = 1.4,
+		Transparency = 0.38,
+	}, panel)
+	new("UIPadding", {
+		PaddingBottom = UDim.new(0, 26),
+		PaddingLeft = UDim.new(0, 30),
+		PaddingRight = UDim.new(0, 30),
+		PaddingTop = UDim.new(0, 28),
+	}, panel)
+
+	local title = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBlack,
-		Position = UDim2.fromScale(0.5, 0.48),
-		Size = UDim2.fromOffset(360, 52),
-		Text = "Loading GEI...",
-		TextColor3 = Color3.fromRGB(244, 248, 250),
+		Size = UDim2.new(1, 0, 0, 48),
+		Text = "Garbage Empire",
+		TextColor3 = Color3.fromRGB(244, 250, 246),
 		TextScaled = true,
-		TextStrokeTransparency = 0.8,
-	}, background)
-
+		TextStrokeTransparency = 0.86,
+	}, panel)
 	new("UITextSizeConstraint", {
-		MaxTextSize = 32,
-		MinTextSize = 14,
-	}, label)
+		MaxTextSize = 36,
+		MinTextSize = 18,
+	}, title)
 
-	local subLabel = new("TextLabel", {
-		AnchorPoint = Vector2.new(0.5, 0),
+	statusLabel = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamMedium,
-		Position = UDim2.fromScale(0.5, 0.54),
-		Size = UDim2.fromOffset(360, 28),
-		Text = "Preparing tools, waste models, and HUD",
-		TextColor3 = Color3.fromRGB(166, 180, 188),
+		Position = UDim2.fromOffset(0, 62),
+		Size = UDim2.new(1, 0, 0, 26),
+		Text = "Loading world...",
+		TextColor3 = Color3.fromRGB(174, 190, 198),
 		TextScaled = true,
-	}, background)
+	}, panel)
+	new("UITextSizeConstraint", {
+		MaxTextSize = 15,
+		MinTextSize = 9,
+	}, statusLabel)
 
+	local progressBack = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(31, 38, 43),
+		BackgroundTransparency = 0.08,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(0, 112),
+		Size = UDim2.new(1, 0, 0, 16),
+	}, panel)
+	new("UICorner", { CornerRadius = UDim.new(1, 0) }, progressBack)
+	new("UIStroke", {
+		Color = Color3.fromRGB(255, 255, 255),
+		Thickness = 1,
+		Transparency = 0.86,
+	}, progressBack)
+
+	progressFill = new("Frame", {
+		BackgroundColor3 = Color3.fromRGB(92, 232, 152),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(0, 1),
+	}, progressBack)
+	new("UICorner", { CornerRadius = UDim.new(1, 0) }, progressFill)
+	new("UIGradient", {
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(92, 232, 152)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(99, 201, 255)),
+		}),
+		Rotation = 0,
+	}, progressFill)
+
+	percentLabel = new("TextLabel", {
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		Position = UDim2.fromOffset(0, 144),
+		Size = UDim2.new(1, 0, 0, 22),
+		Text = "0%",
+		TextColor3 = Color3.fromRGB(118, 235, 168),
+		TextScaled = true,
+	}, panel)
 	new("UITextSizeConstraint", {
 		MaxTextSize = 14,
 		MinTextSize = 8,
-	}, subLabel)
+	}, percentLabel)
+
+	setStatus("Loading world...", 0.08)
 end
 
-local function waitForChildWithLog(parent, childName, timeoutSeconds, label)
-	if not parent then
-		warn("[Loading] Cannot wait for " .. label .. " because parent is missing.")
+local function getRemainingTime()
+	return math.max(0, MAX_LOADING_SECONDS - (os.clock() - startedAt))
+end
+
+local function waitForChildWithinBudget(parent, childName, timeoutSeconds)
+	if not parent or getRemainingTime() <= 0 then
 		return nil
 	end
 
-	local child = parent:FindFirstChild(childName) or parent:WaitForChild(childName, timeoutSeconds)
-	if child then
-		print("[Loading] " .. label .. " ready")
-	else
-		warn("[Loading] Timed out waiting for " .. label .. ". Continuing with fallback startup.")
-	end
-
-	return child
+	local timeout = math.min(timeoutSeconds, getRemainingTime())
+	return parent:FindFirstChild(childName) or parent:WaitForChild(childName, timeout)
 end
 
 local function collectPreloadAssets(folder)
@@ -120,28 +205,26 @@ local function collectPreloadAssets(folder)
 	return assets
 end
 
-local function waitForMainHUDReady(parent, timeoutSeconds)
-	if not parent then
-		warn("[Loading] Cannot wait for MainHUD because PlayerGui is missing.")
+local function waitForMainHUDReady(timeoutSeconds)
+	if not playerGui or getRemainingTime() <= 0 then
 		return nil
 	end
 
-	local startedAt = os.clock()
-	while os.clock() - startedAt < timeoutSeconds do
-		local mainHud = parent:FindFirstChild("MainHUD")
+	local endAt = os.clock() + math.min(timeoutSeconds, getRemainingTime())
+	while os.clock() < endAt do
+		local mainHud = playerGui:FindFirstChild("MainHUD")
 		if mainHud and mainHud:IsA("ScreenGui") and mainHud:FindFirstChild("TopStats") and mainHud:FindFirstChild("ToolBar") then
-			print("[Loading] MainHUD ready")
 			return mainHud
 		end
-		task.wait(0.1)
+		task.wait(0.08)
 	end
 
-	warn("[Loading] Timed out waiting for MainHUD. Continuing with fallback startup.")
 	return nil
 end
 
-local gameDataModule = waitForChildWithLog(ReplicatedStorage, "GameData", TIMEOUTS.Core, "GameData")
-waitForChildWithLog(ReplicatedStorage, "Remotes", TIMEOUTS.Core, "Remotes")
+setStatus("Loading assets...", 0.18)
+waitForChildWithinBudget(ReplicatedStorage, "GameData", 1.5)
+waitForChildWithinBudget(ReplicatedStorage, "Remotes", 1.5)
 
 local preloadAssets = {}
 for _, folderName in ipairs({ "ToolModels", "WasteModels", "PetModels", "Sounds" }) do
@@ -151,48 +234,60 @@ for _, folderName in ipairs({ "ToolModels", "WasteModels", "PetModels", "Sounds"
 	end
 end
 
-if #preloadAssets > 0 then
-	local preloadDone = false
-	local preloadOk = false
-	local preloadError = nil
+if #preloadAssets > 0 and getRemainingTime() > 0 then
+	setStatus("Loading assets...", 0.34)
 
+	local preloadDone = false
 	task.spawn(function()
-		preloadOk, preloadError = pcall(function()
+		pcall(function()
 			ContentProvider:PreloadAsync(preloadAssets)
 		end)
 		preloadDone = true
 	end)
 
-	local startedAt = os.clock()
-	while not preloadDone and os.clock() - startedAt < 10 do
-		task.wait(0.1)
-	end
-
-	if preloadDone and preloadOk then
-		print("[Loading] Preloaded " .. tostring(#preloadAssets) .. " asset instances")
-	elseif preloadDone then
-		warn("[Loading] Preload skipped after error:", preloadError)
-	else
-		warn("[Loading] Preload timed out. Continuing startup.")
+	while not preloadDone and getRemainingTime() > 3.25 do
+		task.wait(0.08)
 	end
 end
 
-waitForChildWithLog(player, "PlayerData", TIMEOUTS.PlayerData, "PlayerData")
+setStatus("Loading player data...", 0.62)
+waitForChildWithinBudget(player, "PlayerData", 1.5)
 
-waitForMainHUDReady(playerGui, TIMEOUTS.HUD)
+setStatus("Loading HUD...", 0.78)
+waitForMainHUDReady(1.75)
 
-if gameDataModule then
-	task.wait(0.15)
-end
+setStatus("Ready!", 1)
+task.wait(0.18)
 
 if gui then
-	local background = gui:FindFirstChildOfClass("Frame")
-	if background then
-		local fade = TweenService:Create(background, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			BackgroundTransparency = 1,
-		})
-		fade:Play()
-		fade.Completed:Wait()
+	local tweens = {}
+	for _, descendant in ipairs(gui:GetDescendants()) do
+		if descendant:IsA("Frame") then
+			table.insert(tweens, tween(descendant, TweenInfo.new(FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				BackgroundTransparency = 1,
+			}))
+		elseif descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+			table.insert(tweens, tween(descendant, TweenInfo.new(FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				BackgroundTransparency = 1,
+				TextTransparency = 1,
+				TextStrokeTransparency = 1,
+			}))
+		elseif descendant:IsA("ImageLabel") or descendant:IsA("ImageButton") then
+			table.insert(tweens, tween(descendant, TweenInfo.new(FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				BackgroundTransparency = 1,
+				ImageTransparency = 1,
+			}))
+		elseif descendant:IsA("UIStroke") then
+			table.insert(tweens, tween(descendant, TweenInfo.new(FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Transparency = 1,
+			}))
+		end
 	end
+
+	local firstTween = tweens[1]
+	if firstTween then
+		firstTween.Completed:Wait()
+	end
+
 	gui:Destroy()
 end
