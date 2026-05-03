@@ -91,12 +91,12 @@ end
 local function getNextText()
 	if not completed.SoldWaste then
 		if getWasteCount() <= 0 then
-			return "Click a Waste Node"
+			return "Clique sur un dechet"
 		end
-		return "Sell your Waste"
+		return "Vends tes dechets"
 	end
 	if not completed.OpenedShop then
-		return "Open the Shop"
+		return "Ouvre la boutique"
 	end
 
 	return nil

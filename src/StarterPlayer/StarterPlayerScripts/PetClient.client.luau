@@ -100,9 +100,16 @@ local function getPetDisplayName(petData)
 	local config = petData and getPetConfig(petData.PetId)
 	local name = config and config.Name or (petData and petData.PetId) or "Pet"
 	if petData and petData.Variant == "Golden" then
-		return "Golden " .. name
+		return "Dore " .. name
 	end
 	return name
+end
+
+local function getVariantDisplayName(variant)
+	if variant == "Golden" then
+		return "Dore"
+	end
+	return variant or "Normal"
 end
 
 local function getEquippedSet()
@@ -162,7 +169,7 @@ local function getErrorMessage(reason)
 		DestroyEquipped = "Desequipe ce pet avant de le detruire.",
 		FuseEquipped = "Desequipe les pets avant de fusionner.",
 		NotEnoughDuplicates = "Pas assez de doubles pour fusionner.",
-		InvalidEgg = "Egg invalide.",
+		InvalidEgg = "Oeuf invalide.",
 		InvalidPet = "Pet invalide.",
 		NotOwned = "Ce pet n'est pas dans ton inventaire.",
 	}
@@ -264,7 +271,7 @@ local storageLabel = new("TextLabel", {
 	Font = Enum.Font.GothamBold,
 	Position = UDim2.fromOffset(24, 58),
 	Size = UDim2.fromOffset(190, 24),
-	Text = "Storage 0/30",
+	Text = "Stockage 0/30",
 	TextColor3 = Color3.fromRGB(190, 205, 212),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -276,7 +283,7 @@ local equippedLabel = new("TextLabel", {
 	Font = Enum.Font.GothamBold,
 	Position = UDim2.fromOffset(220, 58),
 	Size = UDim2.fromOffset(160, 24),
-	Text = "Equipped 0/3",
+	Text = "Equipes 0/3",
 	TextColor3 = Color3.fromRGB(190, 205, 212),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -366,7 +373,7 @@ local detailTitle = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(94, 16),
 	Size = UDim2.new(1, -112, 0, 42),
-	Text = "Select a pet",
+	Text = "Choisis un pet",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	TextWrapped = true,
@@ -391,7 +398,7 @@ local detailDescription = new("TextLabel", {
 	Font = Enum.Font.GothamMedium,
 	Position = UDim2.fromOffset(18, 96),
 	Size = UDim2.new(1, -36, 0, 56),
-	Text = "Click a pet to inspect it.",
+	Text = "Clique un pet pour voir ses bonus.",
 	TextColor3 = Color3.fromRGB(205, 216, 222),
 	TextScaled = true,
 	TextWrapped = true,
@@ -441,7 +448,7 @@ local equipButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0, 18, 1, -112),
 	Size = UDim2.new(1, -36, 0, 34),
-	Text = "Equip",
+	Text = "Equiper",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, detailsPanel)
@@ -456,7 +463,7 @@ local destroyButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0, 18, 1, -68),
 	Size = UDim2.new(0.48, -8, 0, 34),
-	Text = "Destroy",
+	Text = "Detruire",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, detailsPanel)
@@ -471,7 +478,7 @@ local fuseButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(1, -18, 1, -68),
 	Size = UDim2.new(0.48, -8, 0, 34),
-	Text = "Fuse",
+	Text = "Fusionner",
 	TextColor3 = Color3.fromRGB(31, 26, 16),
 	TextScaled = true,
 }, detailsPanel)
@@ -507,6 +514,11 @@ local function getPetBuffText(petData)
 	local buffs = config and config.Buffs or {}
 	local goldenMultiplier = (GameData.Pets and GameData.Pets.GoldenBuffMultiplier) or 1.5
 	local rows = {}
+	local buffLabels = {
+		BackpackMultiplier = "Sac",
+		CashMultiplier = "Cash",
+		DamageMultiplier = "Degats",
+	}
 	for _, buffName in ipairs({ "CashMultiplier", "DamageMultiplier", "BackpackMultiplier" }) do
 		local value = buffs[buffName]
 		if type(value) == "number" then
@@ -514,27 +526,27 @@ local function getPetBuffText(petData)
 			if petData.Variant == "Golden" then
 				finalValue = 1 + ((value - 1) * goldenMultiplier)
 			end
-			table.insert(rows, buffName:gsub("Multiplier", "") .. " " .. formatMultiplier(finalValue))
+			table.insert(rows, (buffLabels[buffName] or buffName) .. " " .. formatMultiplier(finalValue))
 		end
 	end
-	return #rows > 0 and table.concat(rows, "\n") or "No buff"
+	return #rows > 0 and table.concat(rows, "\n") or "Aucun bonus"
 end
 
 local function refreshDetails()
 	local petData = selectedPetUid and getPetByUid(selectedPetUid)
 	local equippedSet = getEquippedSet()
 	local buffs = currentPets.Buffs or {}
-	totalBuffs.Text = "Total Buffs: Cash " .. formatMultiplier(buffs.CashMultiplier)
-		.. " | Damage " .. formatMultiplier(buffs.DamageMultiplier)
-		.. " | Backpack " .. formatMultiplier(buffs.BackpackMultiplier)
+	totalBuffs.Text = "Bonus totaux : Cash " .. formatMultiplier(buffs.CashMultiplier)
+		.. " | Degats " .. formatMultiplier(buffs.DamageMultiplier)
+		.. " | Sac " .. formatMultiplier(buffs.BackpackMultiplier)
 
 	if not petData then
 		preview.BackgroundColor3 = Color3.fromRGB(90, 100, 106)
-		detailTitle.Text = "Select a pet"
+		detailTitle.Text = "Choisis un pet"
 		detailMeta.Text = ""
-		detailDescription.Text = "Click a pet to inspect it."
-		detailBuffs.Text = "Total buffs are shown below."
-		equipButton.Text = "Equip"
+		detailDescription.Text = "Clique un pet pour voir ses bonus."
+		detailBuffs.Text = "Les bonus totaux sont affiches plus bas."
+		equipButton.Text = "Equiper"
 		equipButton.AutoButtonColor = false
 		destroyButton.AutoButtonColor = false
 		fuseButton.AutoButtonColor = false
@@ -547,11 +559,11 @@ local function refreshDetails()
 	local normalCopies = countNormalCopies(petData.PetId)
 	preview.BackgroundColor3 = petData.Variant == "Golden" and Color3.fromRGB(255, 210, 60) or rarityColor
 	detailTitle.Text = getPetDisplayName(petData)
-	detailMeta.Text = (config and config.Rarity or "Unknown") .. " | " .. (petData.Variant or "Normal") .. " | " .. (equipped and "Equipped" or "Not Equipped")
+	detailMeta.Text = (config and config.Rarity or "Inconnu") .. " | " .. getVariantDisplayName(petData.Variant) .. " | " .. (equipped and "Equipe" or "Non equipe")
 	detailMeta.TextColor3 = rarityColor
-	detailDescription.Text = config and config.Description or "A passive helper for your recycling empire."
+	detailDescription.Text = config and config.Description or "Un pet bonus pour Garbage Empire."
 	detailBuffs.Text = getPetBuffText(petData)
-	equipButton.Text = equipped and "Unequip" or "Equip"
+	equipButton.Text = equipped and "Retirer" or "Equiper"
 	equipButton.AutoButtonColor = true
 	destroyButton.AutoButtonColor = true
 	fuseButton.AutoButtonColor = (petData.Variant ~= "Golden" and normalCopies >= 3)
@@ -570,14 +582,14 @@ local function refreshInventory()
 	clearInventory()
 	local equippedSet = getEquippedSet()
 	local inventory = currentPets.Inventory or {}
-	storageLabel.Text = "Storage " .. tostring(#inventory) .. "/" .. tostring(currentPets.MaxStorage or 30)
-	equippedLabel.Text = "Equipped " .. tostring(#(currentPets.Equipped or {})) .. "/" .. tostring(currentPets.MaxEquipped or 3)
+	storageLabel.Text = "Stockage " .. tostring(#inventory) .. "/" .. tostring(currentPets.MaxStorage or 30)
+	equippedLabel.Text = "Equipes " .. tostring(#(currentPets.Equipped or {})) .. "/" .. tostring(currentPets.MaxEquipped or 3)
 
 	if #inventory == 0 then
 		local empty = new("TextLabel", {
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamBold,
-			Text = "No pets yet. Hatch at the Egg Plaza.",
+			Text = "Vous n'avez pas encore de pet.",
 			TextColor3 = Color3.fromRGB(180, 194, 201),
 			TextScaled = true,
 		}, inventoryFrame)
@@ -632,7 +644,7 @@ local function refreshInventory()
 			Font = Enum.Font.GothamBold,
 			Position = UDim2.fromOffset(12, 66),
 			Size = UDim2.new(1, -24, 0, 24),
-			Text = (config and config.Rarity or "Unknown") .. (equipped and " | Equipped" or ""),
+			Text = (config and config.Rarity or "Inconnu") .. (equipped and " | Equipe" or ""),
 			TextColor3 = rarityColor,
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -766,7 +778,7 @@ equipButton.Activated:Connect(function()
 	end
 	local equipped = getEquippedSet()[petData.Uid] == true
 	local response = invokePetRemote(equipped and unequipPetRemote or equipPetRemote, petData.Uid)
-	handlePetAction(response, equipped and "Pet desequipe." or "Pet equipe.")
+	handlePetAction(response, equipped and "Pet retire." or "Pet equipe.")
 end)
 
 destroyButton.Activated:Connect(function()
@@ -864,7 +876,7 @@ local function playHatchAnimation(response)
 	flash.Completed:Wait()
 
 	hatchReveal.TextColor3 = rarityColor
-	hatchReveal.Text = "Hatched\n" .. (petData and getPetDisplayName(petData) or (petConfig and petConfig.Name) or "Pet")
+	hatchReveal.Text = "Nouveau pet\n" .. (petData and getPetDisplayName(petData) or (petConfig and petConfig.Name) or "Pet")
 	task.wait(1.35)
 	hatchGui.Visible = false
 end
@@ -951,7 +963,7 @@ local function createEggOverlay(part)
 		Font = Enum.Font.GothamBlack,
 		Position = UDim2.fromOffset(12, 8),
 		Size = UDim2.new(1, -24, 0, 28),
-		Text = eggConfig and eggConfig.DisplayName or "Starter Egg",
+		Text = eggConfig and eggConfig.DisplayName or "Oeuf de depart",
 		TextColor3 = Color3.fromRGB(255, 226, 112),
 		TextScaled = true,
 	}, frame)
@@ -978,7 +990,7 @@ local function createEggOverlay(part)
 		Font = Enum.Font.GothamBold,
 		Position = hasPriceIcon and UDim2.fromOffset(34, 38) or UDim2.fromOffset(12, 38),
 		Size = hasPriceIcon and UDim2.new(1, -46, 0, 22) or UDim2.new(1, -24, 0, 22),
-		Text = eggConfig and ("Price: " .. formatNumber(eggConfig.Price) .. " " .. priceCurrency) or "Unavailable",
+		Text = eggConfig and ("Prix : " .. formatNumber(eggConfig.Price) .. " " .. priceCurrency) or "Indisponible",
 		TextColor3 = Color3.fromRGB(180, 238, 184),
 		TextScaled = true,
 	}, frame)
@@ -1014,14 +1026,14 @@ local function setupEggHatcher()
 	if not prompt then
 		prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "GEIEggPrompt"
-		prompt.ActionText = "Hatch"
-		prompt.ObjectText = "Starter Egg"
 		prompt.KeyboardKeyCode = Enum.KeyCode.E
 		prompt.HoldDuration = 0
 		prompt.MaxActivationDistance = 12
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = hatcherPart
 	end
+	prompt.ActionText = "Ouvrir"
+	prompt.ObjectText = "Oeuf de depart"
 	if not eggPromptConnected then
 		eggPromptConnected = true
 		prompt.Triggered:Connect(function(triggeringPlayer)

@@ -82,14 +82,14 @@ local function getStatus(category, itemId, config)
 	local owned = ownsItem(category, itemId)
 	local equipped = isEquipped(category, itemId)
 	if equipped then
-		return "Equipped", Color3.fromRGB(77, 172, 104)
+		return "Equipe", Color3.fromRGB(77, 172, 104)
 	elseif owned then
-		return "Equip", Color3.fromRGB(75, 121, 219)
+		return "Equiper", Color3.fromRGB(75, 121, 219)
 	elseif getLeaderCash() >= config.Price then
-		return "Buy", Color3.fromRGB(58, 174, 97)
+		return "Acheter", Color3.fromRGB(58, 174, 97)
 	end
 
-	return "Buy", Color3.fromRGB(119, 127, 132)
+	return "Acheter", Color3.fromRGB(119, 127, 132)
 end
 
 local function getConfig(category, itemId)
@@ -152,7 +152,7 @@ local title = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(24, 18),
 	Size = UDim2.new(1, -88, 0, 34),
-	Text = "Shop",
+	Text = "Boutique",
 	TextColor3 = Color3.fromRGB(23, 28, 31),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -260,7 +260,7 @@ local detailTitle = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(76, 16),
 	Size = UDim2.new(1, -94, 0, 48),
-	Text = "Select an item",
+	Text = "Choisis un item",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -275,7 +275,7 @@ local detailDescription = new("TextLabel", {
 	Font = Enum.Font.GothamMedium,
 	Position = UDim2.fromOffset(18, 78),
 	Size = UDim2.new(1, -36, 0, 54),
-	Text = "Choose an item from the grid.",
+	Text = "Selectionne un item pour voir ses details.",
 	TextColor3 = Color3.fromRGB(207, 218, 222),
 	TextScaled = true,
 	TextWrapped = true,
@@ -305,7 +305,7 @@ local detailAction = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0.5, 0, 1, -18),
 	Size = UDim2.new(1, -36, 0, 42),
-	Text = "Buy",
+	Text = "Acheter",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, detailsPanel)
@@ -413,21 +413,21 @@ local function refreshDetails()
 
 	detailSwatch.BackgroundColor3 = config.Color
 	detailTitle.Text = config.Name
-	detailDescription.Text = config.Description or "No description yet."
+	detailDescription.Text = config.Description or "Aucune description pour l'instant."
 	clearDetailsStats()
 
 	if selectedCategory == "Tool" then
-		addDetailRow("Damage", tostring(config.Damage), 1)
-		addDetailRow("Cooldown", string.format("%.2fs", config.Cooldown or 0), 2)
+		addDetailRow("Degats", tostring(config.Damage), 1)
+		addDetailRow("Delai", string.format("%.2fs", config.Cooldown or 0), 2)
 	else
-		addDetailRow("Capacity", formatNumber(config.Capacity), 1)
+		addDetailRow("Capacite", formatNumber(config.Capacity), 1)
 	end
-	addDetailRow("Price", config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash", 10, config.Price > 0 and "Cash" or nil)
+	addDetailRow("Prix", config.Price <= 0 and "Gratuit" or formatNumber(config.Price) .. " Cash", 10, config.Price > 0 and "Cash" or nil)
 
 	local buttonText, buttonColor = getStatus(selectedCategory, selectedItemId, config)
 	detailAction.Text = buttonText
 	detailAction.BackgroundColor3 = buttonColor
-	detailAction.AutoButtonColor = buttonText ~= "Equipped"
+	detailAction.AutoButtonColor = buttonText ~= "Equipe"
 end
 
 local function clearGrid()
@@ -506,9 +506,9 @@ local function createItemCard(category, itemId, config, layoutOrder)
 
 	local statText
 	if category == "Tool" then
-		statText = tostring(config.Damage) .. " DMG"
+		statText = tostring(config.Damage) .. " degats"
 	else
-		statText = formatNumber(config.Capacity) .. " Capacity"
+		statText = formatNumber(config.Capacity) .. " capacite"
 	end
 
 	local stats = new("TextLabel", {
@@ -546,7 +546,7 @@ local function createItemCard(category, itemId, config, layoutOrder)
 		Font = Enum.Font.GothamBold,
 		Position = priceHasIcon and UDim2.fromOffset(32, 91) or UDim2.fromOffset(12, 91),
 		Size = priceHasIcon and UDim2.new(1, -44, 0, 22) or UDim2.new(1, -24, 0, 22),
-		Text = config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash",
+		Text = config.Price <= 0 and "Gratuit" or formatNumber(config.Price) .. " Cash",
 		TextColor3 = Color3.fromRGB(36, 116, 64),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -557,7 +557,7 @@ local function createItemCard(category, itemId, config, layoutOrder)
 	}, price)
 
 	local action = new("TextButton", {
-		AutoButtonColor = buttonText ~= "Equipped",
+		AutoButtonColor = buttonText ~= "Equipe",
 		BackgroundColor3 = buttonColor,
 		BorderSizePixel = 0,
 		Font = Enum.Font.GothamBlack,
@@ -635,8 +635,8 @@ local function createTab(tabName, text, category, firstItemId, layoutOrder)
 	tabButtons[tabName] = button
 end
 
-createTab("Tools", "Tools", "Tool", GameData.ToolOrder[1], 1)
-createTab("Backpacks", "Backpacks", "Backpack", GameData.BackpackOrder[1], 2)
+createTab("Tools", "Outils", "Tool", GameData.ToolOrder[1], 1)
+createTab("Backpacks", "Sacs", "Backpack", GameData.BackpackOrder[1], 2)
 
 detailAction.Activated:Connect(triggerSelectedAction)
 
@@ -692,26 +692,26 @@ if purchaseResultRemote then
 
 		if ok then
 			if reason == "Bought" then
-				showNotification("Bought " .. itemName, Color3.fromRGB(136, 255, 164))
+				showNotification(itemName .. " achete.", Color3.fromRGB(136, 255, 164))
 			elseif reason == "Equipped" then
-				showNotification("Equipped " .. itemName, Color3.fromRGB(179, 212, 255))
+				showNotification(itemName .. " equipe.", Color3.fromRGB(179, 212, 255))
 			elseif reason == "Unequipped" then
-				showNotification("Unequipped " .. itemName, Color3.fromRGB(207, 218, 222))
+				showNotification(itemName .. " retire.", Color3.fromRGB(207, 218, 222))
 			else
-				showNotification("Updated " .. itemName, Color3.fromRGB(220, 235, 255))
+				showNotification(itemName .. " mis a jour.", Color3.fromRGB(220, 235, 255))
 			end
 		else
 			if SoundUtil then
 				SoundUtil.Play("Error", GameData, playerGui)
 			end
 
-			local message = "Could not buy " .. itemName
+			local message = "Achat impossible : " .. itemName
 			if reason == "NotEnoughCash" then
-				message = "Not enough Cash for " .. itemName
+				message = "Pas assez de Cash pour " .. itemName
 			elseif reason == "UnknownCategory" then
-				message = "Shop category is invalid"
+				message = "Categorie de boutique invalide"
 			elseif reason == "DataMissing" then
-				message = "Player data is not ready"
+				message = "Donnees joueur pas encore pretes"
 			end
 			warn("[ShopClient]", message, "reason:", reason)
 			showNotification(message, Color3.fromRGB(255, 177, 137))

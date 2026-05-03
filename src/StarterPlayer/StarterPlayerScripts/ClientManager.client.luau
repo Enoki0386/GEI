@@ -486,9 +486,9 @@ if attackFeedbackRemote then
 		end
 
 		if feedback.Reason == "BackpackFull" then
-			showFloating("Backpack full", Color3.fromRGB(255, 210, 101))
+			showFloating("Sac plein", Color3.fromRGB(255, 210, 101))
 		elseif feedback.Reason == "ToolUnequipped" then
-			showFloating("Equip your tool", Color3.fromRGB(179, 212, 255))
+			showFloating("Equipe ton outil", Color3.fromRGB(179, 212, 255))
 		elseif feedback.WasteGained and feedback.WasteGained > 0 then
 			local text = "+" .. formatNumber(feedback.WasteGained) .. " Waste"
 			if feedback.DiamondsGained and feedback.DiamondsGained > 0 then
