@@ -179,6 +179,81 @@ GameData.Economy = {
 	StartingDiamonds = 0,
 }
 
+GameData.Pets = {
+	MaxEquipped = 3,
+	DefaultBuffs = {
+		CashMultiplier = 1,
+		DamageMultiplier = 1,
+		BackpackMultiplier = 1,
+	},
+	RarityColors = {
+		Common = Color3.fromRGB(80, 255, 120),
+		Rare = Color3.fromRGB(80, 170, 255),
+		Epic = Color3.fromRGB(190, 90, 255),
+		Legendary = Color3.fromRGB(255, 210, 60),
+	},
+}
+
+GameData.Eggs = {
+	StarterEgg = {
+		Id = "StarterEgg",
+		DisplayName = "Starter Egg",
+		Price = 500,
+		Currency = "Cash",
+		Pets = {
+			{
+				PetId = "GarbageRat",
+				Name = "Garbage Rat",
+				Rarity = "Common",
+				Chance = 50,
+				Buffs = {
+					CashMultiplier = 1.05,
+				},
+			},
+			{
+				PetId = "TrashCat",
+				Name = "Trash Cat",
+				Rarity = "Common",
+				Chance = 30,
+				Buffs = {
+					BackpackMultiplier = 1.05,
+				},
+			},
+			{
+				PetId = "RecycleDog",
+				Name = "Recycle Dog",
+				Rarity = "Rare",
+				Chance = 15,
+				Buffs = {
+					CashMultiplier = 1.10,
+					DamageMultiplier = 1.05,
+				},
+			},
+			{
+				PetId = "ToxicSlime",
+				Name = "Toxic Slime",
+				Rarity = "Epic",
+				Chance = 4,
+				Buffs = {
+					CashMultiplier = 1.20,
+					DamageMultiplier = 1.10,
+				},
+			},
+			{
+				PetId = "GoldenRaccoon",
+				Name = "Golden Raccoon",
+				Rarity = "Legendary",
+				Chance = 1,
+				Buffs = {
+					CashMultiplier = 1.35,
+					DamageMultiplier = 1.20,
+					BackpackMultiplier = 1.10,
+				},
+			},
+		},
+	},
+}
+
 GameData.World = {
 	LobbyFloor = {
 		Position = Vector3.new(0, 0, 0),
@@ -456,6 +531,22 @@ end
 
 function GameData.GetWasteType(wasteId)
 	return GameData.WasteTypes[wasteId]
+end
+
+function GameData.GetEgg(eggId)
+	return GameData.Eggs[eggId]
+end
+
+function GameData.GetPet(petId)
+	for _, eggConfig in pairs(GameData.Eggs) do
+		for _, petConfig in ipairs(eggConfig.Pets) do
+			if petConfig.PetId == petId then
+				return petConfig
+			end
+		end
+	end
+
+	return nil
 end
 
 function GameData.GetCashForWaste(wasteAmount)

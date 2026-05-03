@@ -12,6 +12,13 @@ local REMOTE_NAMES = {
 	"ShopState",
 	"PurchaseResult",
 	"TutorialProgress",
+	"PetInventoryUpdated",
+}
+
+local REMOTE_FUNCTION_NAMES = {
+	"HatchEgg",
+	"EquipPet",
+	"UnequipPet",
 }
 
 local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
@@ -24,6 +31,20 @@ end
 for _, remoteName in ipairs(REMOTE_NAMES) do
 	if not remotesFolder:FindFirstChild(remoteName) then
 		local remote = Instance.new("RemoteEvent")
+		remote.Name = remoteName
+		remote.Parent = remotesFolder
+	end
+end
+
+for _, remoteName in ipairs(REMOTE_FUNCTION_NAMES) do
+	local existing = remotesFolder:FindFirstChild(remoteName)
+	if existing and not existing:IsA("RemoteFunction") then
+		existing:Destroy()
+		existing = nil
+	end
+
+	if not existing then
+		local remote = Instance.new("RemoteFunction")
 		remote.Name = remoteName
 		remote.Parent = remotesFolder
 	end

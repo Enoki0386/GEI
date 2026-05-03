@@ -79,6 +79,95 @@ local function copySet(source)
 	return result
 end
 
+local function copyArray(source)
+	local result = {}
+	if type(source) ~= "table" then
+		return result
+	end
+
+	for _, value in ipairs(source) do
+		table.insert(result, value)
+	end
+
+	return result
+end
+
+local function createDefaultPetsData()
+	return {
+		Inventory = {},
+		Equipped = {},
+		MaxEquipped = (GameData.Pets and GameData.Pets.MaxEquipped) or 3,
+	}
+end
+
+local function sanitizePetsData(petsData)
+	local result = createDefaultPetsData()
+	if type(petsData) ~= "table" then
+		return result
+	end
+
+	if type(petsData.MaxEquipped) == "number" then
+		result.MaxEquipped = math.max(1, math.floor(petsData.MaxEquipped))
+	end
+
+	local ownedByUid = {}
+	if type(petsData.Inventory) == "table" then
+		for _, petData in ipairs(petsData.Inventory) do
+			if type(petData) == "table"
+				and type(petData.Uid) == "string"
+				and petData.Uid ~= ""
+				and type(petData.PetId) == "string"
+				and GameData.GetPet(petData.PetId)
+				and not ownedByUid[petData.Uid]
+			then
+				ownedByUid[petData.Uid] = true
+				table.insert(result.Inventory, {
+					Uid = petData.Uid,
+					PetId = petData.PetId,
+					Level = math.max(1, math.floor(tonumber(petData.Level) or 1)),
+					Locked = petData.Locked == true,
+				})
+			end
+		end
+	end
+
+	local equippedSeen = {}
+	if type(petsData.Equipped) == "table" then
+		for _, petUid in ipairs(petsData.Equipped) do
+			if type(petUid) == "string"
+				and ownedByUid[petUid]
+				and not equippedSeen[petUid]
+				and #result.Equipped < result.MaxEquipped
+			then
+				equippedSeen[petUid] = true
+				table.insert(result.Equipped, petUid)
+			end
+		end
+	end
+
+	return result
+end
+
+local function getBackpackMultiplierFromPetsData(petsData)
+	local sanitized = sanitizePetsData(petsData)
+	local petsByUid = {}
+	for _, petData in ipairs(sanitized.Inventory) do
+		petsByUid[petData.Uid] = petData
+	end
+
+	local multiplier = 1
+	for _, petUid in ipairs(sanitized.Equipped) do
+		local petData = petsByUid[petUid]
+		local petConfig = petData and GameData.GetPet(petData.PetId)
+		local petValue = petConfig and petConfig.Buffs and petConfig.Buffs.BackpackMultiplier
+		if type(petValue) == "number" then
+			multiplier += petValue - 1
+		end
+	end
+
+	return math.max(0, multiplier)
+end
+
 local function getDebugConfig()
 	local debugConfig = GameData.Debug
 	if type(debugConfig) == "table" and debugConfig.Enabled == true then
@@ -105,14 +194,32 @@ local function applyDebugOverrides(saveData)
 	return saveData
 end
 
-local function getToolDamage(tool)
+local function getPetBuffs(player)
+	local petManager = _G.GEI and _G.GEI.PetManager
+	if petManager and petManager.GetPetBuffs then
+		return petManager.GetPetBuffs(player)
+	end
+
+	return {
+		CashMultiplier = 1,
+		DamageMultiplier = 1,
+		BackpackMultiplier = 1,
+	}
+end
+
+local function getToolDamage(player, tool)
 	local multiplier = 1
 	local debugConfig = getDebugConfig()
 	if debugConfig and type(debugConfig.ToolDamageMultiplier) == "number" then
 		multiplier = math.max(0, debugConfig.ToolDamageMultiplier)
 	end
 
-	return math.max(0, math.floor((tool.Damage or 0) * multiplier))
+	local buffs = getPetBuffs(player)
+	if type(buffs.DamageMultiplier) == "number" then
+		multiplier *= math.max(0, buffs.DamageMultiplier)
+	end
+
+	return math.max(0, (tool.Damage or 0) * multiplier)
 end
 
 local function createDefaultSaveData()
@@ -128,6 +235,7 @@ local function createDefaultSaveData()
 		OwnedBackpacks = {
 			SmallBag = true,
 		},
+		Pets = createDefaultPetsData(),
 	})
 end
 
@@ -166,6 +274,7 @@ local function mergeSaveData(savedData)
 			end
 		end
 	end
+	data.Pets = sanitizePetsData(savedData.Pets)
 
 	if not data.OwnedTools[data.EquippedTool] then
 		data.EquippedTool = "Brush"
@@ -237,6 +346,51 @@ local function createOwnedFolder(folderName, ownedSet, parent)
 	return folder
 end
 
+local function createPetFolder(petData, parent)
+	local petFolder = Instance.new("Folder")
+	petFolder.Name = petData.Uid
+	petFolder.Parent = parent
+
+	createValue("StringValue", "Uid", petData.Uid, petFolder)
+	createValue("StringValue", "PetId", petData.PetId, petFolder)
+	createValue("IntValue", "Level", petData.Level or 1, petFolder)
+	createValue("BoolValue", "Locked", petData.Locked == true, petFolder)
+
+	return petFolder
+end
+
+local function createPetsFolder(petsData, parent)
+	local sanitized = sanitizePetsData(petsData)
+	local petsFolder = parent:FindFirstChild("Pets")
+	if petsFolder then
+		petsFolder:Destroy()
+	end
+
+	petsFolder = Instance.new("Folder")
+	petsFolder.Name = "Pets"
+	petsFolder.Parent = parent
+
+	createValue("IntValue", "MaxEquipped", sanitized.MaxEquipped, petsFolder)
+
+	local inventoryFolder = Instance.new("Folder")
+	inventoryFolder.Name = "Inventory"
+	inventoryFolder.Parent = petsFolder
+
+	for _, petData in ipairs(sanitized.Inventory) do
+		createPetFolder(petData, inventoryFolder)
+	end
+
+	local equippedFolder = Instance.new("Folder")
+	equippedFolder.Name = "Equipped"
+	equippedFolder.Parent = petsFolder
+
+	for index, petUid in ipairs(sanitized.Equipped) do
+		createValue("StringValue", "Slot" .. tostring(index), petUid, equippedFolder)
+	end
+
+	return petsFolder
+end
+
 local function applyWalkSpeed(character)
 	local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 10)
 	if humanoid and GameData.Player and type(GameData.Player.WalkSpeed) == "number" then
@@ -262,14 +416,59 @@ local function updateDerivedStats(player)
 	local equippedBackpack = dataFolder:FindFirstChild("EquippedBackpack")
 	local tool = equippedTool and GameData.GetTool(equippedTool.Value) or GameData.GetTool("Brush")
 	local backpack = equippedBackpack and GameData.GetBackpack(equippedBackpack.Value) or GameData.GetBackpack("SmallBag")
+	local buffs = getPetBuffs(player)
+	local backpackMultiplier = type(buffs.BackpackMultiplier) == "number" and math.max(0, buffs.BackpackMultiplier) or 1
+	local effectiveCapacity = math.max(1, math.floor((backpack.Capacity or 1) * backpackMultiplier))
 
-	createValue("NumberValue", "ToolDamage", getToolDamage(tool), dataFolder)
-	createValue("IntValue", "MaxWaste", backpack.Capacity, dataFolder)
+	createValue("NumberValue", "ToolDamage", getToolDamage(player, tool), dataFolder)
+	createValue("IntValue", "MaxWaste", effectiveCapacity, dataFolder)
 
 	local wasteCount = dataFolder:FindFirstChild("WasteCount")
-	if wasteCount and wasteCount.Value > backpack.Capacity then
-		wasteCount.Value = backpack.Capacity
+	if wasteCount and wasteCount.Value > effectiveCapacity then
+		wasteCount.Value = effectiveCapacity
 	end
+end
+
+local function snapshotPets(dataFolder)
+	local petsFolder = dataFolder:FindFirstChild("Pets")
+	local inventoryFolder = petsFolder and petsFolder:FindFirstChild("Inventory")
+	local equippedFolder = petsFolder and petsFolder:FindFirstChild("Equipped")
+	local maxEquippedValue = petsFolder and petsFolder:FindFirstChild("MaxEquipped")
+	local pets = {
+		Inventory = {},
+		Equipped = {},
+		MaxEquipped = maxEquippedValue and maxEquippedValue.Value or ((GameData.Pets and GameData.Pets.MaxEquipped) or 3),
+	}
+
+	if inventoryFolder then
+		for _, petFolder in ipairs(inventoryFolder:GetChildren()) do
+			if petFolder:IsA("Folder") then
+				local uid = petFolder:FindFirstChild("Uid")
+				local petId = petFolder:FindFirstChild("PetId")
+				local level = petFolder:FindFirstChild("Level")
+				local locked = petFolder:FindFirstChild("Locked")
+				if uid and petId and GameData.GetPet(petId.Value) then
+					table.insert(pets.Inventory, {
+						Uid = uid.Value,
+						PetId = petId.Value,
+						Level = level and level.Value or 1,
+						Locked = locked and locked.Value == true or false,
+					})
+				end
+			end
+		end
+	end
+
+	if equippedFolder then
+		for index = 1, pets.MaxEquipped do
+			local slotValue = equippedFolder:FindFirstChild("Slot" .. tostring(index))
+			if slotValue and slotValue:IsA("StringValue") and slotValue.Value ~= "" then
+				table.insert(pets.Equipped, slotValue.Value)
+			end
+		end
+	end
+
+	return pets
 end
 
 local function snapshotPlayerData(player)
@@ -311,6 +510,7 @@ local function snapshotPlayerData(player)
 		ToolDamage = dataFolder.ToolDamage.Value,
 		OwnedTools = ownedTools,
 		OwnedBackpacks = ownedBackpacks,
+		Pets = snapshotPets(dataFolder),
 	}
 end
 
@@ -335,6 +535,11 @@ local function serializePlayer(player)
 		EquippedBackpack = snapshot.EquippedBackpack,
 		OwnedTools = copySet(snapshot.OwnedTools),
 		OwnedBackpacks = copySet(snapshot.OwnedBackpacks),
+		Pets = {
+			Inventory = copyArray(snapshot.Pets.Inventory),
+			Equipped = copyArray(snapshot.Pets.Equipped),
+			MaxEquipped = snapshot.Pets.MaxEquipped,
+		},
 	}
 end
 
@@ -363,6 +568,7 @@ local function setupPlayer(player)
 	local saveData = loadSaveData(player)
 	local backpack = GameData.GetBackpack(saveData.EquippedBackpack) or GameData.GetBackpack("SmallBag")
 	local tool = GameData.GetTool(saveData.EquippedTool) or GameData.GetTool("Brush")
+	local initialMaxWaste = math.max(1, math.floor(backpack.Capacity * getBackpackMultiplierFromPetsData(saveData.Pets)))
 
 	player.CharacterAdded:Connect(applyWalkSpeed)
 	if player.Character then
@@ -381,15 +587,17 @@ local function setupPlayer(player)
 	dataFolder.Parent = player
 	dataFoldersByPlayer[player] = dataFolder
 
-	createValue("IntValue", "WasteCount", math.min(saveData.WasteCount, backpack.Capacity), dataFolder)
-	createValue("IntValue", "MaxWaste", backpack.Capacity, dataFolder)
+	createValue("IntValue", "WasteCount", math.min(saveData.WasteCount, initialMaxWaste), dataFolder)
+	createValue("IntValue", "MaxWaste", initialMaxWaste, dataFolder)
 	createValue("StringValue", "EquippedTool", tool.Id, dataFolder)
 	createValue("BoolValue", "IsToolEquipped", false, dataFolder)
 	createValue("StringValue", "EquippedBackpack", backpack.Id, dataFolder)
-	createValue("NumberValue", "ToolDamage", getToolDamage(tool), dataFolder)
+	createValue("NumberValue", "ToolDamage", getToolDamage(player, tool), dataFolder)
 
 	createOwnedFolder("OwnedTools", saveData.OwnedTools, dataFolder)
 	createOwnedFolder("OwnedBackpacks", saveData.OwnedBackpacks, dataFolder)
+	createPetsFolder(saveData.Pets, dataFolder)
+	updateDerivedStats(player)
 
 	for _, child in ipairs(dataFolder:GetChildren()) do
 		if child:IsA("ValueBase") then
@@ -677,7 +885,9 @@ function PlayerManager.SellWaste(player)
 		return 0
 	end
 
-	local cashEarned = GameData.GetCashForWaste(wasteValue.Value)
+	local buffs = getPetBuffs(player)
+	local cashMultiplier = type(buffs.CashMultiplier) == "number" and math.max(0, buffs.CashMultiplier) or 1
+	local cashEarned = math.max(0, math.floor(GameData.GetCashForWaste(wasteValue.Value) * cashMultiplier))
 	wasteValue.Value = 0
 	leaderstats.Cash.Value += cashEarned
 	pushPlayerData(player)
@@ -685,6 +895,11 @@ function PlayerManager.SellWaste(player)
 end
 
 function PlayerManager.Push(player)
+	pushPlayerData(player)
+end
+
+function PlayerManager.RecalculateDerivedStats(player)
+	updateDerivedStats(player)
 	pushPlayerData(player)
 end
 
