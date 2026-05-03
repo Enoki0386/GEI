@@ -19,12 +19,15 @@ local function isUsableImageId(imageId)
 		and imageId ~= "rbxassetid://0"
 end
 
-function UIIconUtils.GetCurrencyIcon(currencyName)
-	if type(currencyName) ~= "string" then
+local function canApplyImage(instance)
+	return instance and (instance:IsA("ImageLabel") or instance:IsA("ImageButton"))
+end
+
+function UIIconUtils.GetIcon(iconName)
+	if type(iconName) ~= "string" then
 		return ""
 	end
 
-	local iconName = CURRENCY_ALIASES[currencyName] or currencyName
 	local imageId = AssetIds.Icons and AssetIds.Icons[iconName]
 	if isUsableImageId(imageId) then
 		return imageId
@@ -33,8 +36,34 @@ function UIIconUtils.GetCurrencyIcon(currencyName)
 	return ""
 end
 
+function UIIconUtils.GetCurrencyIcon(currencyName)
+	if type(currencyName) ~= "string" then
+		return ""
+	end
+
+	local iconName = CURRENCY_ALIASES[currencyName] or currencyName
+	return UIIconUtils.GetIcon(iconName)
+end
+
+function UIIconUtils.ApplyIcon(imageLabel, iconName)
+	if not canApplyImage(imageLabel) then
+		return false
+	end
+
+	local imageId = UIIconUtils.GetIcon(iconName)
+	if imageId ~= "" then
+		imageLabel.Image = imageId
+		imageLabel.Visible = true
+		return true
+	end
+
+	imageLabel.Image = ""
+	imageLabel.Visible = false
+	return false
+end
+
 function UIIconUtils.ApplyCurrencyIcon(imageLabel, currencyName)
-	if not imageLabel or not (imageLabel:IsA("ImageLabel") or imageLabel:IsA("ImageButton")) then
+	if not canApplyImage(imageLabel) then
 		return false
 	end
 
