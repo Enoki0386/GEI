@@ -2,6 +2,10 @@ local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local SoundUtil = {}
+local SOUND_ALIASES = {
+	WasteHit = "Hit",
+	WasteBreak = "Break",
+}
 
 local function isUsableSoundId(soundId)
 	return type(soundId) == "string"
@@ -17,12 +21,24 @@ local function getConfiguredSoundId(soundName, gameData)
 		return soundId
 	end
 
+	local aliasName = SOUND_ALIASES[soundName]
+	soundId = aliasName and type(soundsConfig) == "table" and soundsConfig[aliasName] or nil
+	if isUsableSoundId(soundId) then
+		return soundId
+	end
+
 	return nil
 end
 
 local function getSoundAsset(soundName)
 	local soundsFolder = ReplicatedStorage:FindFirstChild("Sounds")
 	local source = soundsFolder and soundsFolder:FindFirstChild(soundName)
+	if source and source:IsA("Sound") and isUsableSoundId(source.SoundId) then
+		return source
+	end
+
+	local aliasName = SOUND_ALIASES[soundName]
+	source = aliasName and soundsFolder and soundsFolder:FindFirstChild(aliasName) or nil
 	if source and source:IsA("Sound") and isUsableSoundId(source.SoundId) then
 		return source
 	end

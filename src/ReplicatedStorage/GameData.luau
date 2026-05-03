@@ -30,15 +30,23 @@ GameData.Player = {
 GameData.WasteDisplay = {
 	BillboardMaxDistance = 45,
 	BillboardSize = Vector2.new(180, 78),
+	BackgroundTransparency = 0.35,
 	HPBarHeight = 8,
 	HitShakeDistance = 0.18,
 	HitScaleAmount = 1.08,
 	HitTweenTime = 0.08,
+	RarityColors = {
+		Common = Color3.fromRGB(80, 255, 120),
+		Rare = Color3.fromRGB(80, 170, 255),
+		Epic = Color3.fromRGB(190, 90, 255),
+		Legendary = Color3.fromRGB(255, 210, 60),
+	},
 }
 
 local DEFAULT_WASTE_MODEL_TUNING = {
+	Version = 3,
 	VisualOffset = Vector3.new(0, 0, 0),
-	VisualRotation = Vector3.new(0, 0, 0),
+	VisualRotation = Vector3.new(90, 0, 0),
 	VisualScale = 1,
 	RingOffset = Vector3.new(0, 0, 0),
 	RingRadiusOffset = 0,
@@ -48,10 +56,19 @@ local DEFAULT_WASTE_MODEL_TUNING = {
 GameData.WasteModelConfig = {
 	Zone1 = {
 		CommonWaste = {
-			Default = DEFAULT_WASTE_MODEL_TUNING,
+			Default = {
+				Version = 3,
+				VisualOffset = Vector3.new(0, 0, 0),
+				VisualRotation = Vector3.new(90, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 9.907, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 4, 0),
+			},
 			TrashPile = {
-				VisualOffset = Vector3.new(0, -0.8, 0),
-				VisualRotation = Vector3.new(0, 0, 0),
+				Version = 3,
+				VisualOffset = Vector3.new(0, 0, 0),
+				VisualRotation = Vector3.new(90, 0, 0),
 				VisualScale = 1,
 				RingOffset = Vector3.new(0, 0, 0),
 				RingRadiusOffset = 0,
@@ -59,10 +76,19 @@ GameData.WasteModelConfig = {
 			},
 		},
 		RareWaste = {
-			Default = DEFAULT_WASTE_MODEL_TUNING,
+			Default = {
+				Version = 3,
+				VisualOffset = Vector3.new(0, -0.25, 0),
+				VisualRotation = Vector3.new(90, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 0, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 4, 0),
+			},
 			GarbageBags = {
-				VisualOffset = Vector3.new(0, 0, 0),
-				VisualRotation = Vector3.new(0, 0, 0),
+				Version = 3,
+				VisualOffset = Vector3.new(0, -0.25, 0),
+				VisualRotation = Vector3.new(90, 0, 0),
 				VisualScale = 1,
 				RingOffset = Vector3.new(0, 0, 0),
 				RingRadiusOffset = 0,
@@ -70,32 +96,43 @@ GameData.WasteModelConfig = {
 			},
 		},
 		EpicWaste = {
-			Default = DEFAULT_WASTE_MODEL_TUNING,
-			Barrel = {
-				VisualOffset = Vector3.new(0, 0, 0),
-				VisualRotation = Vector3.new(0, 0, 0),
+			Default = {
+				Version = 3,
+				VisualOffset = Vector3.new(0, -0.15, 0),
+				VisualRotation = Vector3.new(90, 0, 0),
 				VisualScale = 1,
 				RingOffset = Vector3.new(0, 0, 0),
 				RingRadiusOffset = 0,
-				BillboardOffset = Vector3.new(0, 4, 0),
+				BillboardOffset = Vector3.new(0, 4.5, 0),
+			},
+			Barrel = {
+				Version = 3,
+				VisualOffset = Vector3.new(0, -0.15, 0),
+				VisualRotation = Vector3.new(90, 0, 0),
+				VisualScale = 1,
+				RingOffset = Vector3.new(0, 0, 0),
+				RingRadiusOffset = 0,
+				BillboardOffset = Vector3.new(0, 4.5, 0),
 			},
 		},
 		LegendaryWaste = {
 			Default = {
+				Version = 3,
 				VisualOffset = Vector3.new(0, 0, 0),
-				VisualRotation = Vector3.new(0, 0, 0),
+				VisualRotation = Vector3.new(90, 0, 0),
 				VisualScale = 1,
 				RingOffset = Vector3.new(0, 0, 0),
-				RingRadiusOffset = 0,
-				BillboardOffset = Vector3.new(0, 5, 0),
+				RingRadiusOffset = 0.5,
+				BillboardOffset = Vector3.new(0, 5.5, 0),
 			},
 			Boxes = {
-				VisualOffset = Vector3.new(0, 0, 0),
+				Version = 3,
+				VisualOffset = Vector3.new(0, 2, 0),
 				VisualRotation = Vector3.new(0, 0, 0),
 				VisualScale = 1,
-				RingOffset = Vector3.new(0, 0, 0),
-				RingRadiusOffset = 0,
-				BillboardOffset = Vector3.new(0, 5, 0),
+				RingOffset = Vector3.new(0, 3.945, 0),
+				RingRadiusOffset = 0.5,
+				BillboardOffset = Vector3.new(0, 5.5, 0),
 			},
 		},
 	},
@@ -126,10 +163,11 @@ GameData.Animations = {
 }
 
 GameData.Sounds = {
-	WasteHit = "",
-	WasteBreak = "",
+	Hit = "",
+	Break = "",
 	Sell = "",
 	Error = "",
+	Coin = "",
 	Footstep = "",
 	Jump = "",
 }
@@ -178,32 +216,32 @@ GameData.ToolOrder = {
 GameData.ToolModelConfig = {
 	Brush = {
 		ModelName = "Brush",
-		GripPosition = Vector3.new(0, 0, 0),
-		GripRotation = Vector3.new(0, 0, 0),
+		GripPosition = Vector3.new(0.55, -0.75, -0.35),
+		GripRotation = Vector3.new(-70, 18, 12),
 		VisualScale = 1,
 	},
 	Broom = {
 		ModelName = "Broom",
-		GripPosition = Vector3.new(0, 0, 0),
-		GripRotation = Vector3.new(0, 0, 0),
+		GripPosition = Vector3.new(0.6, -0.72, -0.36),
+		GripRotation = Vector3.new(-68, 14, 10),
 		VisualScale = 1,
 	},
 	Vacuum = {
 		ModelName = "Vacuum",
-		GripPosition = Vector3.new(0, 0, 0),
-		GripRotation = Vector3.new(0, 0, 0),
+		GripPosition = Vector3.new(0.58, -0.72, -0.36),
+		GripRotation = Vector3.new(-72, 16, 12),
 		VisualScale = 1,
 	},
 	Hammer = {
 		ModelName = "Hammer",
-		GripPosition = Vector3.new(0, 0, 0),
-		GripRotation = Vector3.new(0, 0, 0),
+		GripPosition = Vector3.new(0.62, -0.7, -0.34),
+		GripRotation = Vector3.new(-66, 10, 8),
 		VisualScale = 1,
 	},
 	Crusher = {
 		ModelName = "Crusher",
-		GripPosition = Vector3.new(0, 0, 0),
-		GripRotation = Vector3.new(0, 0, 0),
+		GripPosition = Vector3.new(0.6, -0.72, -0.36),
+		GripRotation = Vector3.new(-68, 14, 10),
 		VisualScale = 1,
 	},
 }

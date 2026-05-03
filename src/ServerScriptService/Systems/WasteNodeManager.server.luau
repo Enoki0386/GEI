@@ -189,6 +189,9 @@ local function getWasteModelTuning(zoneId, wasteId, variantName)
 	local variantConfig = wasteConfig[variantName] or {}
 
 	return {
+		Version = type(variantConfig.Version) == "number" and variantConfig.Version
+			or type(defaultConfig.Version) == "number" and defaultConfig.Version
+			or 1,
 		VisualOffset = safeVector3(variantConfig.VisualOffset or defaultConfig.VisualOffset),
 		VisualRotation = safeVector3(variantConfig.VisualRotation or defaultConfig.VisualRotation),
 		VisualScale = type(variantConfig.VisualScale) == "number" and variantConfig.VisualScale
@@ -307,6 +310,8 @@ end
 
 local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, modelTuning)
 	local displayConfig = GameData.WasteDisplay
+	local rarityColors = displayConfig.RarityColors or {}
+	local rarityColor = rarityColors[wasteConfig.Rarity] or wasteConfig.AccentColor
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "WasteBillboard"
 	billboard.AlwaysOnTop = true
@@ -318,7 +323,7 @@ local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, mo
 	local frame = Instance.new("Frame")
 	frame.Name = "Frame"
 	frame.BackgroundColor3 = Color3.fromRGB(22, 25, 27)
-	frame.BackgroundTransparency = 0.1
+	frame.BackgroundTransparency = displayConfig.BackgroundTransparency or 0.35
 	frame.BorderSizePixel = 0
 	frame.Size = UDim2.fromScale(1, 1)
 	frame.Parent = billboard
@@ -334,7 +339,7 @@ local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, mo
 	nameLabel.Position = UDim2.fromOffset(8, 4)
 	nameLabel.Size = UDim2.new(1, -16, 0, 24)
 	nameLabel.Text = wasteConfig.Name
-	nameLabel.TextColor3 = wasteConfig.AccentColor
+	nameLabel.TextColor3 = rarityColor
 	nameLabel.TextScaled = true
 	nameLabel.Parent = frame
 
@@ -349,7 +354,7 @@ local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, mo
 	hpLabel.Font = Enum.Font.GothamBlack
 	hpLabel.Position = UDim2.fromOffset(8, 28)
 	hpLabel.Size = UDim2.new(1, -16, 0, 26)
-	hpLabel.Text = tostring(maxHP)
+	hpLabel.Text = tostring(maxHP) .. " HP"
 	hpLabel.TextColor3 = Color3.fromRGB(242, 246, 248)
 	hpLabel.TextScaled = true
 	hpLabel.Parent = frame
@@ -373,7 +378,7 @@ local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, mo
 
 	local barFill = Instance.new("Frame")
 	barFill.Name = "HPBarFill"
-	barFill.BackgroundColor3 = wasteConfig.AccentColor
+	barFill.BackgroundColor3 = rarityColor
 	barFill.BorderSizePixel = 0
 	barFill.Size = UDim2.fromScale(1, 1)
 	barFill.Parent = barBack
@@ -398,7 +403,7 @@ local function updateHPBillboard(wasteModel)
 	local maxHP = math.max(1, math.floor(wasteModel:GetAttribute("MaxHP") or 1))
 
 	if hpLabel and hpLabel:IsA("TextLabel") then
-		hpLabel.Text = tostring(currentHP)
+		hpLabel.Text = tostring(currentHP) .. " HP"
 	end
 
 	if barFill and barFill:IsA("Frame") then
@@ -482,14 +487,26 @@ local function getWasteVisualSource(wasteConfig)
 	local variants = {}
 	if root:IsA("Folder") then
 		for _, child in ipairs(root:GetChildren()) do
-			if (child:IsA("Model") or child:IsA("BasePart") or child:IsA("Folder")) and hasBasePart(child) then
+			if child:IsA("Model") and hasBasePart(child) then
 				table.insert(variants, child)
+			elseif child:IsA("Model") then
+				warnOnce(
+					"WasteModelEmptyVariant_" .. wasteConfig.ModelName .. "_" .. child.Name,
+					"[WasteNodeManager] ReplicatedStorage.WasteModels." .. wasteConfig.ModelName .. "." .. child.Name .. " is a Model variant but has no Part or MeshPart. Add a Main Part/MeshPart."
+				)
+			elseif child:IsA("SpecialMesh") then
+				warnOnce(
+					"WasteModelSpecialMesh_" .. wasteConfig.ModelName .. "_" .. child.Name,
+					"[WasteNodeManager] ReplicatedStorage.WasteModels." .. wasteConfig.ModelName .. "." .. child.Name .. " is a SpecialMesh. Put the SpecialMesh inside a Part or MeshPart named Main."
+				)
+			elseif child:IsA("BasePart") or child:IsA("Folder") then
+				warnOnce(
+					"WasteModelVariantNotModel_" .. wasteConfig.ModelName .. "_" .. child.Name,
+					"[WasteNodeManager] ReplicatedStorage.WasteModels." .. wasteConfig.ModelName .. "." .. child.Name .. " should be a Model variant, for example " .. child.Name .. ".Main."
+				)
 			end
 		end
 
-		if #variants == 0 and hasBasePart(root) then
-			return root, root.Name, true
-		end
 	elseif root:IsA("Model") then
 		if hasBasePart(root) then
 			return root, root.Name, true
@@ -531,6 +548,14 @@ end
 local function choosePrimaryPart(visual)
 	if visual:IsA("BasePart") then
 		return visual
+	end
+
+	local mainPart = visual:FindFirstChild("Main", true)
+	if mainPart and mainPart:IsA("BasePart") then
+		if visual:IsA("Model") then
+			visual.PrimaryPart = mainPart
+		end
+		return mainPart
 	end
 
 	if visual:IsA("Model") and visual.PrimaryPart then
@@ -794,6 +819,7 @@ local function createWasteNode(spawnPosition, wasteZone, surface)
 	model:SetAttribute("RewardCash", 0)
 	model:SetAttribute("DiamondChance", wasteConfig.DiamondChance)
 	model:SetAttribute("DiamondReward", wasteConfig.DiamondReward)
+	setVectorAttributes(model, "NodeBasePosition", spawnPosition)
 
 	local visualInfo = createConfiguredVisual(model, spawnPosition, wasteConfig, zoneId)
 	if not visualInfo then
@@ -805,6 +831,7 @@ local function createWasteNode(spawnPosition, wasteZone, surface)
 	setVectorAttributes(model, "InteractionSize", visualInfo.BoundsSize)
 	model:SetAttribute("VisualModelName", visualInfo.ModelName)
 	model:SetAttribute("VisualVariant", visualInfo.VariantName)
+	model:SetAttribute("ModelConfigVersion", visualInfo.Tuning.Version)
 
 	createBillboard(visualInfo.PrimaryPart, wasteConfig, maxHP, visualInfo.BoundsCFrame.Position, visualInfo.Tuning)
 	createRangeRing(model, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize, wasteConfig, visualInfo.Tuning)

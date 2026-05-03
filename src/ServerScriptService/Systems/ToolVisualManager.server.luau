@@ -11,8 +11,6 @@ local GameData = require(gameDataModule)
 
 _G.GEI = _G.GEI or {}
 
-local DEFAULT_GRIP = CFrame.new(0.55, -0.75, -0.35) * CFrame.Angles(math.rad(-70), math.rad(18), math.rad(12))
-
 local function getToolsFolder()
 	local folder = ReplicatedStorage:FindFirstChild("Tools")
 	if not folder then
@@ -105,6 +103,11 @@ local function getBaseParts(instance)
 end
 
 local function chooseLargestPart(instance)
+	local mainPart = instance:FindFirstChild("Main", true)
+	if mainPart and mainPart:IsA("BasePart") then
+		return mainPart
+	end
+
 	local largestPart = nil
 	local largestVolume = -math.huge
 	for _, part in ipairs(getBaseParts(instance)) do
@@ -179,7 +182,7 @@ local function prepareTool(tool, toolConfig)
 	tool.ToolTip = toolConfig.Name
 	tool.CanBeDropped = false
 	tool.RequiresHandle = true
-	tool.Grip = ((toolConfig.Visual and toolConfig.Visual.GripOffset) or tool.Grip or DEFAULT_GRIP) * getGripOffset(toolConfig)
+	tool.Grip = getGripOffset(toolConfig)
 	tool:SetAttribute("ToolId", toolConfig.Id)
 	tool:SetAttribute("GEINativeTool", true)
 

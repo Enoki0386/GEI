@@ -299,7 +299,7 @@ local function playFallbackSwing(tool, toolConfig)
 	end
 
 	local visualConfig = toolConfig.Visual or {}
-	local baseGrip = visualConfig.GripOffset or tool.Grip
+	local baseGrip = tool.Grip
 	local swingOffset = visualConfig.SwingOffset or (CFrame.new(0, -0.1, -0.45) * CFrame.Angles(math.rad(-30), 0, math.rad(-12)))
 	tool.Grip = baseGrip
 
@@ -370,7 +370,7 @@ if attackFeedbackRemote then
 	attackFeedbackRemote.OnClientEvent:Connect(function(feedback)
 		if type(feedback) == "table" and feedback.Target then
 			if SoundUtil then
-				SoundUtil.Play(feedback.Destroyed and "WasteBreak" or "WasteHit", GameData, feedback.Target.PrimaryPart)
+				SoundUtil.Play(feedback.Destroyed and "Break" or "Hit", GameData, feedback.Target.PrimaryPart)
 			end
 			playTargetFlash(feedback.Target)
 		end
@@ -398,7 +398,7 @@ RunService.RenderStepped:Connect(function()
 				local radius = wasteModel:GetAttribute("InteractionRadius") or calculateFallbackInteractionRadius(size)
 				local inRange = distanceToWaste <= radius
 				local visualRadius = radius
-				local ringCenter = Vector3.new(center.X, center.Y - size.Y / 2 + ringConfig.HeightOffset, center.Z)
+				local ringCenter = center
 
 				for _, segment in ipairs(ring:GetChildren()) do
 					if segment:IsA("BasePart") then

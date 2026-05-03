@@ -53,6 +53,19 @@ local REQUIREMENTS = {
 	},
 }
 
+local OPTIONAL_REQUIREMENTS = {
+	"EggZone",
+	"VIPZone",
+	"Zone2Barrier",
+	"SpawnSurface2",
+	"MachineArea",
+	"SpawnSurface3",
+	"UpgradeShop2",
+	"SpawnSurface4",
+	"BossWasteArea",
+	"PortalDimension2",
+}
+
 local warnedMessages = {}
 
 local function vectorToText(vector)
@@ -119,6 +132,16 @@ local function validateMap()
 		if validateRequirement(requirement) then
 			validCount += 1
 		end
+	end
+
+	local missingOptional = {}
+	for _, optionalName in ipairs(OPTIONAL_REQUIREMENTS) do
+		if not Workspace:FindFirstChild(optionalName) then
+			table.insert(missingOptional, optionalName)
+		end
+	end
+	if #missingOptional > 0 then
+		warnOnce("[MapValidator] Optional future map objects missing: " .. table.concat(missingOptional, ", ") .. ". This is OK until those features are enabled.")
 	end
 
 	if validCount == #REQUIREMENTS then
