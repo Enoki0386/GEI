@@ -63,6 +63,7 @@ local eggOverlayGui = nil
 local eggPromptConnected = false
 local eggWarningShown = false
 local currentHatcherPart = nil
+local hatchInProgress = false
 
 local function new(className, properties, parent)
 	local instance = Instance.new(className)
@@ -171,6 +172,7 @@ local function getErrorMessage(reason)
 		FuseEquipped = "Unequip pets before fusing them.",
 		NotEnoughDuplicates = "Not enough duplicates to fuse.",
 		InvalidEgg = "Invalid egg.",
+		HatchCooldown = "Please wait for the egg to finish opening.",
 		InvalidPet = "Invalid pet.",
 		NotOwned = "This pet is not in your inventory.",
 	}
@@ -1087,7 +1089,12 @@ local function requestHatch()
 		return
 	end
 	hatching = true
-	local response = invokePetRemote(hatchEggRemote, STARTER_EGG_ID)
+	if hatchInProgress then
+				return
+			end
+			hatchInProgress = true
+			prompt.Enabled = false
+			local response = invokePetRemote(hatchEggRemote, STARTER_EGG_ID)
 	hatching = false
 	if response.Success or response.Ok then
 		if SoundUtil then

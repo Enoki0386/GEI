@@ -10,6 +10,7 @@ end
 
 local GameData = require(gameDataModule)
 local random = Random.new()
+local hatchCooldowns = {}
 
 _G.GEI = _G.GEI or {}
 
@@ -442,7 +443,27 @@ local function refreshPlayer(player)
 	PetManager.SendPetInventory(player)
 end
 
+function PetManager.AdminGivePet(player, petId, variant)
+	if type(petId) ~= "string" or not GameData.GetPet(petId) then
+		return false, "Invalid pet"
+	end
+	if getInventoryCount(player) >= getMaxStorage(player) then
+		return false, "Inventory full"
+	end
+	local petData = addPetToInventory(player, petId, variant or "Normal")
+	if not petData then
+		return false, "Could not add pet"
+	end
+	refreshPlayer(player)
+	return true, "Pet given"
+end
+
 function PetManager.HatchEgg(player, eggId)
+	local now = os.clock()
+	if hatchCooldowns[player] and now - hatchCooldowns[player] < 3.2 then
+		return makeResponse(false, "HatchCooldown", { Pets = PetManager.GetSnapshot(player) })
+	end
+	hatchCooldowns[player] = now
 	if type(eggId) ~= "string" then
 		return makeResponse(false, "InvalidEgg")
 	end
