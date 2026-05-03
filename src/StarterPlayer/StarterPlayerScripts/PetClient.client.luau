@@ -13,9 +13,13 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
-local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 20)
-	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 20)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 20)
+local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 20)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
+local assetIdsModule = sharedFolder and sharedFolder:WaitForChild("AssetIds", 20)
+local currencyIconUtilModule = sharedFolder and sharedFolder:WaitForChild("CurrencyIconUtil", 20)
+local AssetIds = assetIdsModule and require(assetIdsModule)
+local CurrencyIconUtil = currencyIconUtilModule and require(currencyIconUtilModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then
 	warn("[PetClient] Missing ReplicatedStorage.Remotes. Pet UI disabled.")
@@ -955,12 +959,28 @@ local function createEggOverlay(part)
 	}, frame)
 	new("UITextSizeConstraint", { MaxTextSize = 19, MinTextSize = 10 }, header)
 
+	local priceCurrency = eggConfig and (eggConfig.Currency or "Cash") or "Cash"
+	local priceIconId = CurrencyIconUtil and CurrencyIconUtil.GetCurrencyIcon(AssetIds, priceCurrency)
+	local hasPriceIcon = eggConfig ~= nil and priceIconId ~= nil
+	local priceIcon = new("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = "",
+		Position = UDim2.fromOffset(12, 42),
+		ScaleType = Enum.ScaleType.Fit,
+		Size = UDim2.fromOffset(16, 16),
+		Visible = false,
+	}, frame)
+	if hasPriceIcon then
+		priceIcon.Image = priceIconId
+		priceIcon.Visible = true
+	end
+
 	local price = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
-		Position = UDim2.fromOffset(12, 38),
-		Size = UDim2.new(1, -24, 0, 22),
-		Text = eggConfig and ("Price: " .. formatNumber(eggConfig.Price) .. " Cash") or "Unavailable",
+		Position = hasPriceIcon and UDim2.fromOffset(34, 38) or UDim2.fromOffset(12, 38),
+		Size = hasPriceIcon and UDim2.new(1, -46, 0, 22) or UDim2.new(1, -24, 0, 22),
+		Text = eggConfig and ("Price: " .. formatNumber(eggConfig.Price) .. " " .. priceCurrency) or "Unavailable",
 		TextColor3 = Color3.fromRGB(180, 238, 184),
 		TextScaled = true,
 	}, frame)

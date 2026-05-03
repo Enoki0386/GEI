@@ -16,9 +16,13 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
-local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 20)
-	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 20)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 20)
+local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 20)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
+local assetIdsModule = sharedFolder and sharedFolder:WaitForChild("AssetIds", 20)
+local currencyIconUtilModule = sharedFolder and sharedFolder:WaitForChild("CurrencyIconUtil", 20)
+local AssetIds = assetIdsModule and require(assetIdsModule)
+local CurrencyIconUtil = currencyIconUtilModule and require(currencyIconUtilModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ClientManager stopped.")
@@ -112,7 +116,7 @@ new("UIPadding", {
 
 local statLabels = {}
 
-local function createStatPill(name, title, color, layoutOrder)
+local function createStatPill(name, title, color, layoutOrder, currencyName)
 	local pill = new("Frame", {
 		Name = name,
 		BackgroundColor3 = Color3.fromRGB(31, 38, 43),
@@ -135,11 +139,24 @@ local function createStatPill(name, title, color, layoutOrder)
 	}, pill)
 	new("UICorner", { CornerRadius = UDim.new(1, 0) }, accent)
 
+	local icon = new("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = "",
+		Position = UDim2.fromOffset(15, 9),
+		ScaleType = Enum.ScaleType.Fit,
+		Size = UDim2.fromOffset(20, 20),
+		Visible = false,
+	}, pill)
+	local hasIcon = CurrencyIconUtil and CurrencyIconUtil.ApplyToImage(icon, AssetIds, currencyName)
+	if hasIcon then
+		accent.Visible = false
+	end
+
 	local titleLabel = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
-		Position = UDim2.fromOffset(18, 4),
-		Size = UDim2.new(0.4, -8, 1, -8),
+		Position = hasIcon and UDim2.fromOffset(42, 4) or UDim2.fromOffset(18, 4),
+		Size = hasIcon and UDim2.new(0.35, -8, 1, -8) or UDim2.new(0.4, -8, 1, -8),
 		Text = title,
 		TextColor3 = color,
 		TextScaled = true,
@@ -153,8 +170,8 @@ local function createStatPill(name, title, color, layoutOrder)
 	local valueLabel = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBlack,
-		Position = UDim2.new(0.42, 0, 0, 4),
-		Size = UDim2.new(0.58, -12, 1, -8),
+		Position = hasIcon and UDim2.new(0.5, 0, 0, 4) or UDim2.new(0.42, 0, 0, 4),
+		Size = hasIcon and UDim2.new(0.5, -12, 1, -8) or UDim2.new(0.58, -12, 1, -8),
 		Text = "0",
 		TextColor3 = Color3.fromRGB(244, 247, 248),
 		TextScaled = true,
@@ -168,9 +185,9 @@ local function createStatPill(name, title, color, layoutOrder)
 	statLabels[name] = valueLabel
 end
 
-createStatPill("Cash", "Cash", Color3.fromRGB(116, 231, 139), 1)
-createStatPill("Waste", "Waste", Color3.fromRGB(255, 211, 112), 2)
-createStatPill("Diamonds", "Diamonds", Color3.fromRGB(126, 216, 255), 3)
+createStatPill("Cash", "Cash", Color3.fromRGB(116, 231, 139), 1, "Cash")
+createStatPill("Waste", "Waste", Color3.fromRGB(255, 211, 112), 2, "Waste")
+createStatPill("Diamonds", "Diamonds", Color3.fromRGB(126, 216, 255), 3, "Diamonds")
 
 local toolbar = new("Frame", {
 	Name = "ToolBar",

@@ -10,9 +10,13 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
-local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 10)
-	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 10)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 10)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
+local assetIdsModule = sharedFolder and sharedFolder:WaitForChild("AssetIds", 10)
+local currencyIconUtilModule = sharedFolder and sharedFolder:WaitForChild("CurrencyIconUtil", 10)
+local AssetIds = assetIdsModule and require(assetIdsModule)
+local CurrencyIconUtil = currencyIconUtilModule and require(currencyIconUtilModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ShopClient stopped.")
@@ -352,7 +356,7 @@ local function clearDetailsStats()
 	end
 end
 
-local function addDetailRow(labelText, valueText, layoutOrder)
+local function addDetailRow(labelText, valueText, layoutOrder, currencyName)
 	local row = new("Frame", {
 		BackgroundColor3 = Color3.fromRGB(35, 43, 47),
 		BackgroundTransparency = 0.05,
@@ -377,11 +381,21 @@ local function addDetailRow(labelText, valueText, layoutOrder)
 		MinTextSize = 8,
 	}, label)
 
+	local icon = new("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = "",
+		Position = UDim2.new(0.48, 0, 0.5, -9),
+		ScaleType = Enum.ScaleType.Fit,
+		Size = UDim2.fromOffset(18, 18),
+		Visible = false,
+	}, row)
+	local hasIcon = CurrencyIconUtil and CurrencyIconUtil.ApplyToImage(icon, AssetIds, currencyName)
+
 	local value = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBlack,
-		Position = UDim2.new(0.48, 0, 0, 4),
-		Size = UDim2.new(0.52, -10, 1, -8),
+		Position = hasIcon and UDim2.new(0.48, 22, 0, 4) or UDim2.new(0.48, 0, 0, 4),
+		Size = hasIcon and UDim2.new(0.52, -32, 1, -8) or UDim2.new(0.52, -10, 1, -8),
 		Text = valueText,
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		TextScaled = true,
@@ -410,7 +424,7 @@ local function refreshDetails()
 	else
 		addDetailRow("Capacity", formatNumber(config.Capacity), 1)
 	end
-	addDetailRow("Price", config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash", 10)
+	addDetailRow("Price", config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash", 10, config.Price > 0 and "Cash" or nil)
 
 	local buttonText, buttonColor = getStatus(selectedCategory, selectedItemId, config)
 	detailAction.Text = buttonText
@@ -514,11 +528,26 @@ local function createItemCard(category, itemId, config, layoutOrder)
 		MinTextSize = 8,
 	}, stats)
 
+	local priceIconId = CurrencyIconUtil and CurrencyIconUtil.GetCurrencyIcon(AssetIds, "Cash")
+	local priceHasIcon = config.Price > 0 and priceIconId ~= nil
+	local priceIcon = new("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = "",
+		Position = UDim2.fromOffset(12, 94),
+		ScaleType = Enum.ScaleType.Fit,
+		Size = UDim2.fromOffset(16, 16),
+		Visible = false,
+	}, card)
+	if priceHasIcon then
+		priceIcon.Image = priceIconId
+		priceIcon.Visible = true
+	end
+
 	local price = new("TextLabel", {
 		BackgroundTransparency = 1,
 		Font = Enum.Font.GothamBold,
-		Position = UDim2.fromOffset(12, 91),
-		Size = UDim2.new(1, -24, 0, 22),
+		Position = priceHasIcon and UDim2.fromOffset(32, 91) or UDim2.fromOffset(12, 91),
+		Size = priceHasIcon and UDim2.new(1, -44, 0, 22) or UDim2.new(1, -24, 0, 22),
 		Text = config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash",
 		TextColor3 = Color3.fromRGB(36, 116, 64),
 		TextScaled = true,
