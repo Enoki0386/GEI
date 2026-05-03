@@ -205,6 +205,59 @@ local function getWasteModelTuning(zoneId, wasteId, variantName)
 	}
 end
 
+local function getBillboardYOffset(modelTuning)
+	local offset = modelTuning and modelTuning.BillboardOffset
+	if typeof(offset) == "Vector3" then
+		return offset.Y
+	end
+
+	return 4
+end
+
+local function getBillboardBaseCenter(ringCenter, boundsCenter)
+	return Vector3.new(ringCenter.X, boundsCenter.Y, ringCenter.Z)
+end
+
+local function createOrUpdateBillboardAnchor(wasteModel, baseCenter)
+	local anchor = wasteModel:FindFirstChild("BillboardAnchor")
+	if anchor and not anchor:IsA("BasePart") then
+		anchor:Destroy()
+		anchor = nil
+	end
+
+	if not anchor then
+		anchor = Instance.new("Part")
+		anchor.Name = "BillboardAnchor"
+		anchor.Parent = wasteModel
+	end
+
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+	anchor.CFrame = CFrame.new(baseCenter)
+
+	return anchor
+end
+
+local function findWasteBillboard(wasteModel)
+	local anchor = wasteModel:FindFirstChild("BillboardAnchor")
+	local billboard = anchor and anchor:FindFirstChild("WasteBillboard")
+	if billboard and billboard:IsA("BillboardGui") then
+		return billboard
+	end
+
+	local primaryPart = wasteModel.PrimaryPart
+	billboard = primaryPart and primaryPart:FindFirstChild("WasteBillboard")
+	if billboard and billboard:IsA("BillboardGui") then
+		return billboard
+	end
+
+	return nil
+end
+
 local function getWasteCenter(wasteModel)
 	local center = vectorFromAttributes(wasteModel, "InteractionCenter")
 	if center then
@@ -308,17 +361,19 @@ local function findSpawnPosition(surface, wasteZone)
 	return nil
 end
 
-local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, modelTuning)
+local function createBillboard(wasteModel, wasteConfig, maxHP, billboardBaseCenter, modelTuning)
 	local displayConfig = GameData.WasteDisplay
 	local rarityColors = displayConfig.RarityColors or {}
 	local rarityColor = rarityColors[wasteConfig.Rarity] or wasteConfig.AccentColor
+	local anchor = createOrUpdateBillboardAnchor(wasteModel, billboardBaseCenter)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "WasteBillboard"
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = displayConfig.BillboardMaxDistance
 	billboard.Size = UDim2.fromOffset(displayConfig.BillboardSize.X, displayConfig.BillboardSize.Y)
-	billboard.StudsOffset = boundsCenter + modelTuning.BillboardOffset - primaryPart.Position
-	billboard.Parent = primaryPart
+	billboard.Adornee = anchor
+	billboard.StudsOffset = Vector3.new(0, getBillboardYOffset(modelTuning), 0)
+	billboard.Parent = anchor
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Frame"
@@ -389,12 +444,7 @@ local function createBillboard(primaryPart, wasteConfig, maxHP, boundsCenter, mo
 end
 
 local function updateHPBillboard(wasteModel)
-	local primaryPart = wasteModel.PrimaryPart
-	if not primaryPart then
-		return
-	end
-
-	local billboard = primaryPart:FindFirstChild("WasteBillboard")
+	local billboard = findWasteBillboard(wasteModel)
 	local frame = billboard and billboard:FindFirstChild("Frame")
 	local hpLabel = frame and frame:FindFirstChild("HPLabel")
 	local barBack = frame and frame:FindFirstChild("HPBarBack")
@@ -457,6 +507,8 @@ local function createRangeRing(wasteModel, boundsCenter, boundsSize, wasteConfig
 			* CFrame.Angles(0, -angle - math.pi / 2, 0)
 		segment.Parent = ringFolder
 	end
+
+	return center
 end
 
 local function hasBasePart(instance)
@@ -833,8 +885,9 @@ local function createWasteNode(spawnPosition, wasteZone, surface)
 	model:SetAttribute("VisualVariant", visualInfo.VariantName)
 	model:SetAttribute("ModelConfigVersion", visualInfo.Tuning.Version)
 
-	createBillboard(visualInfo.PrimaryPart, wasteConfig, maxHP, visualInfo.BoundsCFrame.Position, visualInfo.Tuning)
-	createRangeRing(model, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize, wasteConfig, visualInfo.Tuning)
+	local ringCenter = createRangeRing(model, visualInfo.BoundsCFrame.Position, visualInfo.BoundsSize, wasteConfig, visualInfo.Tuning)
+	local billboardBaseCenter = getBillboardBaseCenter(ringCenter, visualInfo.BoundsCFrame.Position)
+	createBillboard(model, wasteConfig, maxHP, billboardBaseCenter, visualInfo.Tuning)
 	model.Parent = wasteZone
 	CollectionService:AddTag(model, "WasteNode")
 end
