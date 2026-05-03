@@ -13,12 +13,16 @@ local REMOTE_NAMES = {
 	"PurchaseResult",
 	"TutorialProgress",
 	"PetInventoryUpdated",
+	"PetError",
+	"PetHatchResult",
 }
 
 local REMOTE_FUNCTION_NAMES = {
 	"HatchEgg",
 	"EquipPet",
 	"UnequipPet",
+	"DestroyPet",
+	"FusePet",
 }
 
 local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")

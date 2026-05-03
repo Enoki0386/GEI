@@ -144,7 +144,7 @@ local gameDataModule = waitForChildWithLog(ReplicatedStorage, "GameData", TIMEOU
 waitForChildWithLog(ReplicatedStorage, "Remotes", TIMEOUTS.Core, "Remotes")
 
 local preloadAssets = {}
-for _, folderName in ipairs({ "ToolModels", "WasteModels", "Sounds" }) do
+for _, folderName in ipairs({ "ToolModels", "WasteModels", "PetModels", "Sounds" }) do
 	local folder = ReplicatedStorage:FindFirstChild(folderName)
 	for _, asset in ipairs(collectPreloadAssets(folder)) do
 		table.insert(preloadAssets, asset)

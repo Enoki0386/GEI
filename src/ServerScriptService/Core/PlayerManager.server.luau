@@ -97,6 +97,8 @@ local function createDefaultPetsData()
 		Inventory = {},
 		Equipped = {},
 		MaxEquipped = (GameData.Pets and GameData.Pets.MaxEquipped) or 3,
+		MaxStorage = (GameData.Pets and (GameData.Pets.MaxStorage or GameData.Pets.BasePetStorage)) or 30,
+		Discovered = {},
 	}
 end
 
@@ -108,6 +110,16 @@ local function sanitizePetsData(petsData)
 
 	if type(petsData.MaxEquipped) == "number" then
 		result.MaxEquipped = math.max(1, math.floor(petsData.MaxEquipped))
+	end
+	if type(petsData.MaxStorage) == "number" then
+		result.MaxStorage = math.max(1, math.floor(petsData.MaxStorage))
+	end
+	if type(petsData.Discovered) == "table" then
+		for petId, discovered in pairs(petsData.Discovered) do
+			if discovered == true and type(petId) == "string" and GameData.GetPet(petId) then
+				result.Discovered[petId] = true
+			end
+		end
 	end
 
 	local ownedByUid = {}
@@ -126,7 +138,9 @@ local function sanitizePetsData(petsData)
 					PetId = petData.PetId,
 					Level = math.max(1, math.floor(tonumber(petData.Level) or 1)),
 					Locked = petData.Locked == true,
+					Variant = type(petData.Variant) == "string" and petData.Variant or "Normal",
 				})
+				result.Discovered[petData.PetId] = true
 			end
 		end
 	end
@@ -161,7 +175,11 @@ local function getBackpackMultiplierFromPetsData(petsData)
 		local petConfig = petData and GameData.GetPet(petData.PetId)
 		local petValue = petConfig and petConfig.Buffs and petConfig.Buffs.BackpackMultiplier
 		if type(petValue) == "number" then
-			multiplier += petValue - 1
+			local bonus = petValue - 1
+			if petData.Variant == "Golden" then
+				bonus *= (GameData.Pets and GameData.Pets.GoldenBuffMultiplier) or 1.5
+			end
+			multiplier += bonus
 		end
 	end
 
@@ -355,6 +373,7 @@ local function createPetFolder(petData, parent)
 	createValue("StringValue", "PetId", petData.PetId, petFolder)
 	createValue("IntValue", "Level", petData.Level or 1, petFolder)
 	createValue("BoolValue", "Locked", petData.Locked == true, petFolder)
+	createValue("StringValue", "Variant", petData.Variant or "Normal", petFolder)
 
 	return petFolder
 end
@@ -371,6 +390,7 @@ local function createPetsFolder(petsData, parent)
 	petsFolder.Parent = parent
 
 	createValue("IntValue", "MaxEquipped", sanitized.MaxEquipped, petsFolder)
+	createValue("IntValue", "MaxStorage", sanitized.MaxStorage, petsFolder)
 
 	local inventoryFolder = Instance.new("Folder")
 	inventoryFolder.Name = "Inventory"
@@ -386,6 +406,16 @@ local function createPetsFolder(petsData, parent)
 
 	for index, petUid in ipairs(sanitized.Equipped) do
 		createValue("StringValue", "Slot" .. tostring(index), petUid, equippedFolder)
+	end
+
+	local discoveredFolder = Instance.new("Folder")
+	discoveredFolder.Name = "Discovered"
+	discoveredFolder.Parent = petsFolder
+
+	for petId, discovered in pairs(sanitized.Discovered) do
+		if discovered == true then
+			createValue("BoolValue", petId, true, discoveredFolder)
+		end
 	end
 
 	return petsFolder
@@ -433,11 +463,15 @@ local function snapshotPets(dataFolder)
 	local petsFolder = dataFolder:FindFirstChild("Pets")
 	local inventoryFolder = petsFolder and petsFolder:FindFirstChild("Inventory")
 	local equippedFolder = petsFolder and petsFolder:FindFirstChild("Equipped")
+	local discoveredFolder = petsFolder and petsFolder:FindFirstChild("Discovered")
 	local maxEquippedValue = petsFolder and petsFolder:FindFirstChild("MaxEquipped")
+	local maxStorageValue = petsFolder and petsFolder:FindFirstChild("MaxStorage")
 	local pets = {
 		Inventory = {},
 		Equipped = {},
 		MaxEquipped = maxEquippedValue and maxEquippedValue.Value or ((GameData.Pets and GameData.Pets.MaxEquipped) or 3),
+		MaxStorage = maxStorageValue and maxStorageValue.Value or ((GameData.Pets and (GameData.Pets.MaxStorage or GameData.Pets.BasePetStorage)) or 30),
+		Discovered = {},
 	}
 
 	if inventoryFolder then
@@ -447,14 +481,25 @@ local function snapshotPets(dataFolder)
 				local petId = petFolder:FindFirstChild("PetId")
 				local level = petFolder:FindFirstChild("Level")
 				local locked = petFolder:FindFirstChild("Locked")
+				local variant = petFolder:FindFirstChild("Variant")
 				if uid and petId and GameData.GetPet(petId.Value) then
 					table.insert(pets.Inventory, {
 						Uid = uid.Value,
 						PetId = petId.Value,
 						Level = level and level.Value or 1,
 						Locked = locked and locked.Value == true or false,
+						Variant = variant and variant.Value or "Normal",
 					})
+					pets.Discovered[petId.Value] = true
 				end
+			end
+		end
+	end
+
+	if discoveredFolder then
+		for _, child in ipairs(discoveredFolder:GetChildren()) do
+			if child:IsA("BoolValue") and child.Value == true and GameData.GetPet(child.Name) then
+				pets.Discovered[child.Name] = true
 			end
 		end
 	end
@@ -539,6 +584,8 @@ local function serializePlayer(player)
 			Inventory = copyArray(snapshot.Pets.Inventory),
 			Equipped = copyArray(snapshot.Pets.Equipped),
 			MaxEquipped = snapshot.Pets.MaxEquipped,
+			MaxStorage = snapshot.Pets.MaxStorage,
+			Discovered = copySet(snapshot.Pets.Discovered),
 		},
 	}
 end
