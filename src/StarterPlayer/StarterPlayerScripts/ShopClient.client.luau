@@ -82,14 +82,14 @@ local function getStatus(category, itemId, config)
 	local owned = ownsItem(category, itemId)
 	local equipped = isEquipped(category, itemId)
 	if equipped then
-		return "Equipe", Color3.fromRGB(77, 172, 104)
+		return "Equipped", Color3.fromRGB(119, 127, 132)
 	elseif owned then
-		return "Equiper", Color3.fromRGB(75, 121, 219)
+		return "Equip", Color3.fromRGB(75, 121, 219)
 	elseif getLeaderCash() >= config.Price then
-		return "Acheter", Color3.fromRGB(58, 174, 97)
+		return "Buy", Color3.fromRGB(58, 174, 97)
 	end
 
-	return "Acheter", Color3.fromRGB(119, 127, 132)
+	return "Buy", Color3.fromRGB(119, 127, 132)
 end
 
 local function getConfig(category, itemId)
@@ -305,7 +305,7 @@ local detailAction = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0.5, 0, 1, -18),
 	Size = UDim2.new(1, -36, 0, 42),
-	Text = "Acheter",
+	Text = "Buy",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, detailsPanel)
@@ -417,17 +417,17 @@ local function refreshDetails()
 	clearDetailsStats()
 
 	if selectedCategory == "Tool" then
-		addDetailRow("Degats", tostring(config.Damage), 1)
-		addDetailRow("Delai", string.format("%.2fs", config.Cooldown or 0), 2)
+		addDetailRow("Damage", tostring(config.Damage), 1)
+		addDetailRow("Cooldown", string.format("%.2fs", config.Cooldown or 0), 2)
 	else
-		addDetailRow("Capacite", formatNumber(config.Capacity), 1)
+		addDetailRow("Capacity", formatNumber(config.Capacity), 1)
 	end
-	addDetailRow("Prix", config.Price <= 0 and "Gratuit" or formatNumber(config.Price) .. " Cash", 10, config.Price > 0 and "Cash" or nil)
+	addDetailRow("Price", config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash", 10, config.Price > 0 and "Cash" or nil)
 
 	local buttonText, buttonColor = getStatus(selectedCategory, selectedItemId, config)
 	detailAction.Text = buttonText
 	detailAction.BackgroundColor3 = buttonColor
-	detailAction.AutoButtonColor = buttonText ~= "Equipe"
+	detailAction.AutoButtonColor = buttonText ~= "Equipped"
 end
 
 local function clearGrid()
@@ -451,6 +451,7 @@ local function triggerSelectedAction()
 	end
 
 	if isEquipped(selectedCategory, selectedItemId) then
+		showNotification("Already equipped.", Color3.fromRGB(207, 218, 222))
 		return
 	end
 
@@ -506,9 +507,9 @@ local function createItemCard(category, itemId, config, layoutOrder)
 
 	local statText
 	if category == "Tool" then
-		statText = tostring(config.Damage) .. " degats"
+		statText = tostring(config.Damage) .. " damage"
 	else
-		statText = formatNumber(config.Capacity) .. " capacite"
+		statText = formatNumber(config.Capacity) .. " capacity"
 	end
 
 	local stats = new("TextLabel", {
@@ -546,7 +547,7 @@ local function createItemCard(category, itemId, config, layoutOrder)
 		Font = Enum.Font.GothamBold,
 		Position = priceHasIcon and UDim2.fromOffset(32, 91) or UDim2.fromOffset(12, 91),
 		Size = priceHasIcon and UDim2.new(1, -44, 0, 22) or UDim2.new(1, -24, 0, 22),
-		Text = config.Price <= 0 and "Gratuit" or formatNumber(config.Price) .. " Cash",
+		Text = config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash",
 		TextColor3 = Color3.fromRGB(36, 116, 64),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -557,7 +558,7 @@ local function createItemCard(category, itemId, config, layoutOrder)
 	}, price)
 
 	local action = new("TextButton", {
-		AutoButtonColor = buttonText ~= "Equipe",
+		AutoButtonColor = buttonText ~= "Equipped",
 		BackgroundColor3 = buttonColor,
 		BorderSizePixel = 0,
 		Font = Enum.Font.GothamBlack,

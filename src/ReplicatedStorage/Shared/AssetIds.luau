@@ -1,19 +1,7 @@
 local AssetIds = {}
 
 AssetIds.Icons = {
-	Coin = "", -- Exemple: "rbxassetid://ID_COIN"
-	Diamond = "", -- Exemple: "rbxassetid://ID_DIAMOND"
-	Waste = "",
-
-	Egg = "",
-	Pet = "",
-	Inventory = "",
-	Gamepass = "",
-	Upgrade = "",
+    Coin = "rbxassetid://2047155752",
+    Diamond = "rbxassetid://993482650",
+    Waste = "",
 }
-
-AssetIds.Gamepasses = {}
-
-AssetIds.Thumbnails = {}
-
-return AssetIds

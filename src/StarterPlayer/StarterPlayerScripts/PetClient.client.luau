@@ -62,8 +62,6 @@ local followerModels = {}
 local eggOverlayGui = nil
 local eggPromptConnected = false
 local eggWarningShown = false
-local currentHatcherPart = nil
-local hatchInProgress = false
 
 local function new(className, properties, parent)
 	local instance = Instance.new(className)
@@ -102,14 +100,14 @@ local function getPetDisplayName(petData)
 	local config = petData and getPetConfig(petData.PetId)
 	local name = config and config.Name or (petData and petData.PetId) or "Pet"
 	if petData and petData.Variant == "Golden" then
-		return "Golden " .. name
+		return "Dore " .. name
 	end
 	return name
 end
 
 local function getVariantDisplayName(variant)
 	if variant == "Golden" then
-		return "Golden"
+		return "Dore"
 	end
 	return variant or "Normal"
 end
@@ -165,18 +163,17 @@ end
 
 local function getErrorMessage(reason)
 	local messages = {
-		NotEnoughCash = "Not enough Cash.",
-		InventoryFull = "Inventory full.",
-		MaxEquipped = "You already have 3 pets equipped.",
-		DestroyEquipped = "Unequip this pet before destroying it.",
-		FuseEquipped = "Unequip pets before fusing them.",
-		NotEnoughDuplicates = "Not enough duplicates to fuse.",
-		InvalidEgg = "Invalid egg.",
-		HatchCooldown = "Please wait for the egg to finish opening.",
-		InvalidPet = "Invalid pet.",
-		NotOwned = "This pet is not in your inventory.",
+		NotEnoughCash = "Pas assez de Cash.",
+		InventoryFull = "Vous n'avez plus d'espace.",
+		MaxEquipped = "Vous avez deja 3 pets equipes.",
+		DestroyEquipped = "Desequipe ce pet avant de le detruire.",
+		FuseEquipped = "Desequipe les pets avant de fusionner.",
+		NotEnoughDuplicates = "Pas assez de doubles pour fusionner.",
+		InvalidEgg = "Oeuf invalide.",
+		InvalidPet = "Pet invalide.",
+		NotOwned = "Ce pet n'est pas dans ton inventaire.",
 	}
-	return messages[reason] or "Action unavailable."
+	return messages[reason] or "Action impossible."
 end
 
 local function invokePetRemote(remote, ...)
@@ -222,7 +219,7 @@ local inventoryButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(1, -22, 1, -122),
 	Size = UDim2.fromOffset(120, 42),
-	Text = "Inventory",
+	Text = "Inventaire",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, gui)
@@ -262,7 +259,7 @@ local title = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(24, 18),
 	Size = UDim2.new(0.42, 0, 0, 36),
-	Text = "Inventory",
+	Text = "Inventaire",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -274,7 +271,7 @@ local storageLabel = new("TextLabel", {
 	Font = Enum.Font.GothamBold,
 	Position = UDim2.fromOffset(24, 58),
 	Size = UDim2.fromOffset(190, 24),
-	Text = "Storage 0/30",
+	Text = "Stockage 0/30",
 	TextColor3 = Color3.fromRGB(190, 205, 212),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -286,7 +283,7 @@ local equippedLabel = new("TextLabel", {
 	Font = Enum.Font.GothamBold,
 	Position = UDim2.fromOffset(220, 58),
 	Size = UDim2.fromOffset(160, 24),
-	Text = "Equipped 0/3",
+	Text = "Equipes 0/3",
 	TextColor3 = Color3.fromRGB(190, 205, 212),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -376,7 +373,7 @@ local detailTitle = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(94, 16),
 	Size = UDim2.new(1, -112, 0, 42),
-	Text = "Select a Pet",
+	Text = "Choisis un pet",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	TextWrapped = true,
@@ -401,7 +398,7 @@ local detailDescription = new("TextLabel", {
 	Font = Enum.Font.GothamMedium,
 	Position = UDim2.fromOffset(18, 96),
 	Size = UDim2.new(1, -36, 0, 56),
-	Text = "Click a pet to view its bonuses.",
+	Text = "Clique un pet pour voir ses bonus.",
 	TextColor3 = Color3.fromRGB(205, 216, 222),
 	TextScaled = true,
 	TextWrapped = true,
@@ -428,44 +425,19 @@ new("UICorner", { CornerRadius = UDim.new(0, 12) }, detailBuffs)
 new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, detailBuffs)
 new("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 8 }, detailBuffs)
 
-local buffsPanel = new("Frame", {
-	AnchorPoint = Vector2.new(1, 0.5),
-	BackgroundColor3 = Color3.fromRGB(18, 23, 28),
-	BackgroundTransparency = 0.03,
-	BorderSizePixel = 0,
-	Position = UDim2.new(1, -24, 0.52, 0),
-	Size = UDim2.fromOffset(250, 132),
-	ZIndex = 4,
-}, overlay)
-new("UICorner", { CornerRadius = UDim.new(0, 18) }, buffsPanel)
-new("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 1, Transparency = 0.78 }, buffsPanel)
-
-local buffsTitle = new("TextLabel", {
-	BackgroundTransparency = 1,
-	Font = Enum.Font.GothamBlack,
-	Position = UDim2.fromOffset(14, 12),
-	Size = UDim2.new(1, -28, 0, 26),
-	Text = "Total Buffs",
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	TextScaled = true,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ZIndex = 5,
-}, buffsPanel)
-new("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 10 }, buffsTitle)
-
 local totalBuffs = new("TextLabel", {
+	AnchorPoint = Vector2.new(0, 1),
 	BackgroundTransparency = 1,
 	Font = Enum.Font.GothamBold,
-	Position = UDim2.fromOffset(14, 44),
-	Size = UDim2.new(1, -28, 1, -56),
+	Position = UDim2.new(0, 18, 1, -162),
+	Size = UDim2.new(1, -36, 0, 58),
 	Text = "",
 	TextColor3 = Color3.fromRGB(202, 215, 222),
 	TextScaled = true,
 	TextWrapped = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
-	TextYAlignment = Enum.TextYAlignment.Top,
-	ZIndex = 5,
-}, buffsPanel)
+	TextYAlignment = Enum.TextYAlignment.Bottom,
+}, detailsPanel)
 new("UITextSizeConstraint", { MaxTextSize = 13, MinTextSize = 8 }, totalBuffs)
 
 local equipButton = new("TextButton", {
@@ -476,7 +448,7 @@ local equipButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0, 18, 1, -112),
 	Size = UDim2.new(1, -36, 0, 34),
-	Text = "Equip",
+	Text = "Equiper",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, detailsPanel)
@@ -491,7 +463,7 @@ local destroyButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0, 18, 1, -68),
 	Size = UDim2.new(0.48, -8, 0, 34),
-	Text = "Destroy",
+	Text = "Detruire",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, detailsPanel)
@@ -506,7 +478,7 @@ local fuseButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(1, -18, 1, -68),
 	Size = UDim2.new(0.48, -8, 0, 34),
-	Text = "Fuse",
+	Text = "Fusionner",
 	TextColor3 = Color3.fromRGB(31, 26, 16),
 	TextScaled = true,
 }, detailsPanel)
@@ -539,7 +511,7 @@ local destroyConfirmTitle = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(18, 18),
 	Size = UDim2.new(1, -36, 0, 34),
-	Text = "Destroy this pet?",
+	Text = "Détruire ce pet ?",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	ZIndex = 42,
@@ -551,7 +523,7 @@ local destroyConfirmText = new("TextLabel", {
 	Font = Enum.Font.GothamMedium,
 	Position = UDim2.fromOffset(22, 60),
 	Size = UDim2.new(1, -44, 0, 48),
-	Text = "This pet will be permanently deleted.",
+	Text = "Ce pet sera supprimé définitivement.",
 	TextColor3 = Color3.fromRGB(208, 220, 226),
 	TextScaled = true,
 	TextWrapped = true,
@@ -567,7 +539,7 @@ local destroyCancelButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0, 22, 1, -18),
 	Size = UDim2.new(0.5, -30, 0, 38),
-	Text = "Cancel",
+	Text = "Annuler",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	ZIndex = 42,
@@ -583,7 +555,7 @@ local destroyConfirmButton = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(1, -22, 1, -18),
 	Size = UDim2.new(0.5, -30, 0, 38),
-	Text = "Destroy",
+	Text = "Détruire",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	ZIndex = 42,
@@ -621,9 +593,9 @@ local function getPetBuffText(petData)
 	local goldenMultiplier = (GameData.Pets and GameData.Pets.GoldenBuffMultiplier) or 1.5
 	local rows = {}
 	local buffLabels = {
-		BackpackMultiplier = "Backpack",
+		BackpackMultiplier = "Sac",
 		CashMultiplier = "Cash",
-		DamageMultiplier = "Damage",
+		DamageMultiplier = "Degats",
 	}
 	for _, buffName in ipairs({ "CashMultiplier", "DamageMultiplier", "BackpackMultiplier" }) do
 		local value = buffs[buffName]
@@ -635,7 +607,7 @@ local function getPetBuffText(petData)
 			table.insert(rows, (buffLabels[buffName] or buffName) .. " " .. formatMultiplier(finalValue))
 		end
 	end
-	return #rows > 0 and table.concat(rows, "\n") or "No bonus"
+	return #rows > 0 and table.concat(rows, "\n") or "Aucun bonus"
 end
 
 local function refreshDetails()
@@ -643,17 +615,17 @@ local function refreshDetails()
 	local equippedSet = getEquippedSet()
 	local buffs = currentPets.Buffs or {}
 	local hasInventory = #(currentPets.Inventory or {}) > 0
-	totalBuffs.Text = "Total Buffs: Cash " .. formatMultiplier(buffs.CashMultiplier)
-		.. " | Damage " .. formatMultiplier(buffs.DamageMultiplier)
-		.. " | Backpack " .. formatMultiplier(buffs.BackpackMultiplier)
+	totalBuffs.Text = "Bonus totaux : Cash " .. formatMultiplier(buffs.CashMultiplier)
+		.. " | Degats " .. formatMultiplier(buffs.DamageMultiplier)
+		.. " | Sac " .. formatMultiplier(buffs.BackpackMultiplier)
 
 	if not petData then
 		preview.BackgroundColor3 = Color3.fromRGB(90, 100, 106)
-		detailTitle.Text = hasInventory and "Select a pet" or "No pet selected"
+		detailTitle.Text = hasInventory and "Sélectionne un pet" or "Aucun pet équipé."
 		detailMeta.Text = ""
-		detailDescription.Text = hasInventory and "Select a pet to view its details." or "Open an egg to get a bonus pet."
-		detailBuffs.Text = "Total buffs are shown on the side."
-		equipButton.Text = "Equip"
+		detailDescription.Text = hasInventory and "Sélectionne un pet pour voir ses détails." or "Ouvre un œuf pour obtenir un pet bonus."
+		detailBuffs.Text = "Les bonus totaux restent visibles ici."
+		equipButton.Text = "Equiper"
 		equipButton.AutoButtonColor = false
 		destroyButton.AutoButtonColor = false
 		fuseButton.AutoButtonColor = false
@@ -666,11 +638,11 @@ local function refreshDetails()
 	local normalCopies = countNormalCopies(petData.PetId)
 	preview.BackgroundColor3 = petData.Variant == "Golden" and Color3.fromRGB(255, 210, 60) or rarityColor
 	detailTitle.Text = getPetDisplayName(petData)
-	detailMeta.Text = (config and config.Rarity or "Unknown") .. " | " .. getVariantDisplayName(petData.Variant) .. " | " .. (equipped and "Equipped" or "Not Equipped")
+	detailMeta.Text = (config and config.Rarity or "Inconnu") .. " | " .. getVariantDisplayName(petData.Variant) .. " | " .. (equipped and "Equipe" or "Non equipe")
 	detailMeta.TextColor3 = rarityColor
-	detailDescription.Text = config and config.Description or "A bonus pet for Garbage Empire."
+	detailDescription.Text = config and config.Description or "Un pet bonus pour Garbage Empire."
 	detailBuffs.Text = getPetBuffText(petData)
-	equipButton.Text = equipped and "Unequip" or "Equip"
+	equipButton.Text = equipped and "Retirer" or "Equiper"
 	equipButton.AutoButtonColor = true
 	destroyButton.AutoButtonColor = true
 	fuseButton.AutoButtonColor = (petData.Variant ~= "Golden" and normalCopies >= 3)
@@ -693,8 +665,8 @@ local function refreshInventory()
 	local equippedSet = getEquippedSet()
 	local inventory = currentPets.Inventory or {}
 	local equippedCount = #(currentPets.Equipped or {})
-	storageLabel.Text = "Storage " .. tostring(#inventory) .. "/" .. tostring(currentPets.MaxStorage or 30)
-	equippedLabel.Text = equippedCount > 0 and ("Equipped " .. tostring(equippedCount) .. "/" .. tostring(currentPets.MaxEquipped or 3)) or "No pet equipped"
+	storageLabel.Text = "Stockage " .. tostring(#inventory) .. "/" .. tostring(currentPets.MaxStorage or 30)
+	equippedLabel.Text = equippedCount > 0 and ("Équipés " .. tostring(equippedCount) .. "/" .. tostring(currentPets.MaxEquipped or 3)) or "Aucun pet équipé."
 
 	if #inventory == 0 then
 		gridLayout.Parent = nil
@@ -709,7 +681,7 @@ local function refreshInventory()
 			Font = Enum.Font.GothamBold,
 			Position = UDim2.fromScale(0.5, 0.43),
 			Size = UDim2.new(1, -32, 0, 34),
-			Text = "You do not have any pets yet.",
+			Text = "Vous n'avez pas encore de pet.",
 			TextColor3 = Color3.fromRGB(221, 232, 236),
 			TextScaled = true,
 		}, emptyFrame)
@@ -721,7 +693,7 @@ local function refreshInventory()
 			Font = Enum.Font.GothamMedium,
 			Position = UDim2.fromScale(0.5, 0.52),
 			Size = UDim2.new(1, -40, 0, 26),
-			Text = "Open an egg to get one.",
+			Text = "Ouvre un œuf pour en obtenir un.",
 			TextColor3 = Color3.fromRGB(162, 178, 186),
 			TextScaled = true,
 		}, emptyFrame)
@@ -777,7 +749,7 @@ local function refreshInventory()
 			Font = Enum.Font.GothamBold,
 			Position = UDim2.fromOffset(12, 66),
 			Size = UDim2.new(1, -24, 0, 24),
-			Text = (config and config.Rarity or "Unknown") .. (equipped and " | Equipped" or ""),
+			Text = (config and config.Rarity or "Inconnu") .. (equipped and " | Equipe" or ""),
 			TextColor3 = rarityColor,
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -930,7 +902,7 @@ local function openDestroyConfirmation(petData)
 	end
 
 	pendingDestroyPetUid = petData.Uid
-	destroyConfirmText.Text = getPetDisplayName(petData) .. " will be permanently deleted."
+	destroyConfirmText.Text = getPetDisplayName(petData) .. " sera supprimé définitivement."
 	destroyConfirmOverlay.Visible = true
 	destroyConfirmScale.Scale = 0.9
 
@@ -948,7 +920,7 @@ equipButton.Activated:Connect(function()
 	end
 	local equipped = getEquippedSet()[petData.Uid] == true
 	local response = invokePetRemote(equipped and unequipPetRemote or equipPetRemote, petData.Uid)
-	handlePetAction(response, equipped and "Pet unequipped." or "Pet equipped.")
+	handlePetAction(response, equipped and "Pet retire." or "Pet equipe.")
 end)
 
 destroyButton.Activated:Connect(function()
@@ -958,7 +930,7 @@ destroyButton.Activated:Connect(function()
 	end
 
 	if getEquippedSet()[petData.Uid] then
-		showMessage("Unequip this pet before destroying it.", Color3.fromRGB(255, 177, 137))
+		showMessage("Déséquipe ce pet avant de le détruire.", Color3.fromRGB(255, 177, 137))
 		if SoundUtil then
 			SoundUtil.Play("Error", GameData, playerGui)
 		end
@@ -980,7 +952,7 @@ destroyConfirmButton.Activated:Connect(function()
 
 	if getEquippedSet()[petUid] then
 		closeDestroyConfirmation()
-		showMessage("Unequip this pet before destroying it.", Color3.fromRGB(255, 177, 137))
+		showMessage("Déséquipe ce pet avant de le détruire.", Color3.fromRGB(255, 177, 137))
 		if SoundUtil then
 			SoundUtil.Play("Error", GameData, playerGui)
 		end
@@ -989,7 +961,7 @@ destroyConfirmButton.Activated:Connect(function()
 
 	closeDestroyConfirmation()
 	local response = invokePetRemote(destroyPetRemote, petUid)
-	handlePetAction(response, "Pet destroyed.")
+	handlePetAction(response, "Pet détruit.")
 end)
 
 fuseButton.Activated:Connect(function()
@@ -998,7 +970,7 @@ fuseButton.Activated:Connect(function()
 		return
 	end
 	local response = invokePetRemote(fusePetRemote, petData.Uid)
-	handlePetAction(response, "Fusion successful.")
+	handlePetAction(response, "Fusion reussie.")
 end)
 
 inventoryButton.Activated:Connect(function()
@@ -1078,7 +1050,7 @@ local function playHatchAnimation(response)
 	flash.Completed:Wait()
 
 	hatchReveal.TextColor3 = rarityColor
-	hatchReveal.Text = "New Pet\n" .. (petData and getPetDisplayName(petData) or (petConfig and petConfig.Name) or "Pet")
+	hatchReveal.Text = "Nouveau pet\n" .. (petData and getPetDisplayName(petData) or (petConfig and petConfig.Name) or "Pet")
 	task.wait(1.35)
 	hatchGui.Visible = false
 end
@@ -1089,12 +1061,7 @@ local function requestHatch()
 		return
 	end
 	hatching = true
-	if hatchInProgress then
-				return
-			end
-			hatchInProgress = true
-			prompt.Enabled = false
-			local response = invokePetRemote(hatchEggRemote, STARTER_EGG_ID)
+	local response = invokePetRemote(hatchEggRemote, STARTER_EGG_ID)
 	hatching = false
 	if response.Success or response.Ok then
 		if SoundUtil then
@@ -1118,36 +1085,27 @@ local function getHatcherPart(instance)
 	if instance:IsA("BasePart") then
 		return instance
 	end
-
-	local main = instance:FindFirstChild("Main", true)
-	if main then
-		if main:IsA("BasePart") then
+	if instance:IsA("Model") then
+		local main = instance:FindFirstChild("Main", true)
+		if main and main:IsA("BasePart") then
 			return main
 		end
-		for _, descendant in ipairs(main:GetDescendants()) do
+		if instance.PrimaryPart then
+			return instance.PrimaryPart
+		end
+		for _, descendant in ipairs(instance:GetDescendants()) do
 			if descendant:IsA("BasePart") then
 				return descendant
 			end
 		end
 	end
-
-	if instance:IsA("Model") and instance.PrimaryPart then
-		return instance.PrimaryPart
-	end
-
-	for _, descendant in ipairs(instance:GetDescendants()) do
-		if descendant:IsA("BasePart") then
-			return descendant
-		end
-	end
-
 	return nil
 end
 
 local function findEggHatcher()
 	local plaza = Workspace:FindFirstChild("EggPlaza")
-	local hatcher = plaza and plaza:FindFirstChild("EggHatcher", true)
-	return hatcher or Workspace:FindFirstChild("EggHatcher", true)
+	local hatcher = plaza and plaza:FindFirstChild("EggHatcher")
+	return hatcher or Workspace:FindFirstChild("EggHatcher")
 end
 
 local function createEggOverlay(part)
@@ -1160,10 +1118,9 @@ local function createEggOverlay(part)
 		Name = "GEIEggOverlay",
 		Adornee = part,
 		AlwaysOnTop = true,
-		Enabled = false,
-		MaxDistance = 120,
+		MaxDistance = 45,
 		Size = UDim2.fromOffset(250, 238),
-		StudsOffset = Vector3.new(0, 6, 0),
+		StudsOffset = Vector3.new(0, 5, 0),
 	}, part)
 
 	local frame = new("Frame", {
@@ -1180,7 +1137,7 @@ local function createEggOverlay(part)
 		Font = Enum.Font.GothamBlack,
 		Position = UDim2.fromOffset(12, 8),
 		Size = UDim2.new(1, -24, 0, 28),
-		Text = eggConfig and eggConfig.DisplayName or "Starter Egg",
+		Text = eggConfig and eggConfig.DisplayName or "Oeuf de depart",
 		TextColor3 = Color3.fromRGB(255, 226, 112),
 		TextScaled = true,
 	}, frame)
@@ -1207,7 +1164,7 @@ local function createEggOverlay(part)
 		Font = Enum.Font.GothamBold,
 		Position = hasPriceIcon and UDim2.fromOffset(34, 38) or UDim2.fromOffset(12, 38),
 		Size = hasPriceIcon and UDim2.new(1, -46, 0, 22) or UDim2.new(1, -24, 0, 22),
-		Text = eggConfig and ("Price: " .. formatNumber(eggConfig.Price) .. " " .. priceCurrency) or "Unavailable",
+		Text = eggConfig and ("Prix : " .. formatNumber(eggConfig.Price) .. " " .. priceCurrency) or "Indisponible",
 		TextColor3 = Color3.fromRGB(180, 238, 184),
 		TextScaled = true,
 	}, frame)
@@ -1234,7 +1191,6 @@ local function setupEggHatcher()
 		return
 	end
 
-	currentHatcherPart = hatcherPart
 	createEggOverlay(hatcherPart)
 	local prompt = hatcherPart:FindFirstChild("GEIEggPrompt")
 	if prompt and not prompt:IsA("ProximityPrompt") then
@@ -1250,8 +1206,8 @@ local function setupEggHatcher()
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = hatcherPart
 	end
-	prompt.ActionText = "Open"
-	prompt.ObjectText = "Starter Egg"
+	prompt.ActionText = "Ouvrir"
+	prompt.ObjectText = "Oeuf de depart"
 	if not eggPromptConnected then
 		eggPromptConnected = true
 		prompt.Triggered:Connect(function(triggeringPlayer)
@@ -1378,15 +1334,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not root then
-		if eggOverlayGui then
-			eggOverlayGui.Enabled = false
-		end
 		return
-	end
-
-	if eggOverlayGui and currentHatcherPart and currentHatcherPart.Parent then
-		local distance = (root.Position - currentHatcherPart.Position).Magnitude
-		eggOverlayGui.Enabled = distance <= 18
 	end
 
 	local equippedSet = getEquippedSet()
@@ -1425,8 +1373,8 @@ player.CharacterAdded:Connect(function()
 	rebuildFollowers()
 end)
 
-Workspace.DescendantAdded:Connect(function(descendant)
-	if descendant.Name == "EggPlaza" or descendant.Name == "EggHatcher" or descendant.Name == "Main" then
+Workspace.ChildAdded:Connect(function(child)
+	if child.Name == "EggPlaza" or child.Name == "EggHatcher" then
 		task.defer(setupEggHatcher)
 	end
 end)
