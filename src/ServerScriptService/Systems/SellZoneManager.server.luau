@@ -9,6 +9,9 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local workspaceUtilModule = sharedFolder and sharedFolder:WaitForChild("WorkspaceUtil", 10)
+local WorkspaceUtil = workspaceUtilModule and require(workspaceUtilModule)
 local playersInside = {}
 local lastSellTimes = {}
 local zoneWarningShown = false
@@ -40,14 +43,20 @@ local function ensureRemote(remoteName)
 end
 
 local function getZone()
-	local zone = Workspace:FindFirstChild("SellZone")
+	local zone, path
+	if WorkspaceUtil then
+		zone, path = WorkspaceUtil.Find("SellZone", { "Areas" }, { SearchDescendants = true })
+	else
+		zone = Workspace:FindFirstChild("SellZone")
+		path = "Workspace.SellZone"
+	end
 	if zone and zone:IsA("BasePart") then
 		return zone
 	end
 
 	if not zoneWarningShown then
 		if zone then
-			warn("[SellZoneManager] Workspace.SellZone exists but must be a Part/BasePart. Selling is disabled until this is fixed.")
+			warn("[SellZoneManager] " .. (path or "Workspace.SellZone") .. " exists but must be a Part/BasePart. Selling is disabled until this is fixed.")
 		else
 			warn("[SellZoneManager] Missing Workspace.SellZone. Create a Part named SellZone. Recommended size: 20, 1, 16.")
 		end

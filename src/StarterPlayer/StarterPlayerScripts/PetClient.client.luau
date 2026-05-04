@@ -60,10 +60,11 @@ local currentPets = {
 local selectedPetUid = nil
 local followerModels = {}
 local eggOverlayGui = nil
-local eggPromptConnected = false
 local eggWarningShown = false
 local currentHatcherPart = nil
 local hatchInProgress = false
+local eggPromptConnection = nil
+local connectedEggPrompt = nil
 
 local function new(className, properties, parent)
 	local instance = Instance.new(className)
@@ -161,6 +162,71 @@ local function setPetsSnapshot(snapshot)
 	if selectedPetUid and not getPetByUid(selectedPetUid) then
 		selectedPetUid = nil
 	end
+end
+
+local function readPetsSnapshotFromPlayerData()
+	local dataFolder = player:FindFirstChild("PlayerData")
+	local petsFolder = dataFolder and dataFolder:FindFirstChild("Pets")
+	if not petsFolder then
+		return nil
+	end
+
+	local inventoryFolder = petsFolder:FindFirstChild("Inventory")
+	local equippedFolder = petsFolder:FindFirstChild("Equipped")
+	local discoveredFolder = petsFolder:FindFirstChild("Discovered")
+	local maxEquipped = petsFolder:FindFirstChild("MaxEquipped")
+	local maxStorage = petsFolder:FindFirstChild("MaxStorage")
+	local snapshot = {
+		Inventory = {},
+		Equipped = {},
+		MaxEquipped = maxEquipped and maxEquipped.Value or currentPets.MaxEquipped,
+		MaxStorage = maxStorage and maxStorage.Value or currentPets.MaxStorage,
+		Discovered = {},
+		Buffs = currentPets.Buffs,
+	}
+
+	if inventoryFolder then
+		for _, petFolder in ipairs(inventoryFolder:GetChildren()) do
+			if petFolder:IsA("Folder") then
+				local uid = petFolder:FindFirstChild("Uid")
+				local petId = petFolder:FindFirstChild("PetId")
+				if uid and petId and GameData.GetPet(petId.Value) then
+					local level = petFolder:FindFirstChild("Level")
+					local locked = petFolder:FindFirstChild("Locked")
+					local variant = petFolder:FindFirstChild("Variant")
+					local obtainedAt = petFolder:FindFirstChild("ObtainedAt")
+					table.insert(snapshot.Inventory, {
+						Uid = uid.Value,
+						PetId = petId.Value,
+						Level = level and level.Value or 1,
+						Locked = locked and locked.Value == true,
+						Variant = variant and variant.Value or "Normal",
+						ObtainedAt = obtainedAt and obtainedAt.Value or 0,
+					})
+					snapshot.Discovered[petId.Value] = true
+				end
+			end
+		end
+	end
+
+	if equippedFolder then
+		for index = 1, snapshot.MaxEquipped do
+			local slotValue = equippedFolder:FindFirstChild("Slot" .. tostring(index))
+			if slotValue and slotValue:IsA("StringValue") and slotValue.Value ~= "" then
+				table.insert(snapshot.Equipped, slotValue.Value)
+			end
+		end
+	end
+
+	if discoveredFolder then
+		for _, child in ipairs(discoveredFolder:GetChildren()) do
+			if child:IsA("BoolValue") and child.Value == true and GameData.GetPet(child.Name) then
+				snapshot.Discovered[child.Name] = true
+			end
+		end
+	end
+
+	return snapshot
 end
 
 local function getErrorMessage(reason)
@@ -870,6 +936,10 @@ local function openInventory()
 	if openTween then
 		openTween:Cancel()
 	end
+	local snapshot = readPetsSnapshotFromPlayerData()
+	if snapshot then
+		setPetsSnapshot(snapshot)
+	end
 	overlay.Visible = true
 	panelScale.Scale = 0.88
 	refreshAll()
@@ -1268,9 +1338,13 @@ local function setupEggHatcher()
 	end
 	prompt.ActionText = "Open"
 	prompt.ObjectText = "Starter Egg"
-	if not eggPromptConnected then
-		eggPromptConnected = true
-		prompt.Triggered:Connect(function(triggeringPlayer)
+	if connectedEggPrompt ~= prompt then
+		if eggPromptConnection then
+			eggPromptConnection:Disconnect()
+			eggPromptConnection = nil
+		end
+		connectedEggPrompt = prompt
+		eggPromptConnection = prompt.Triggered:Connect(function(triggeringPlayer)
 			if triggeringPlayer == nil or triggeringPlayer == player then
 				requestHatch()
 			end
@@ -1355,6 +1429,7 @@ local function clonePetVisual(petData)
 	end
 
 	visual.Name = "PetFollower_" .. petData.Uid
+	visual:SetAttribute("GEIPetFollower", true)
 	setFollowerPartProperties(visual, forceGoldenColor == true)
 	local main = visual:FindFirstChild("Main", true)
 	if main and main:IsA("BasePart") then
@@ -1368,6 +1443,11 @@ local function clonePetVisual(petData)
 		end
 	end
 	visual.Parent = Workspace
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root and visual.PrimaryPart then
+		visual:PivotTo(root.CFrame * CFrame.new(0, 2.5, 4))
+	end
 	return visual
 end
 
@@ -1459,4 +1539,9 @@ if petErrorRemote then
 end
 
 setupEggHatcher()
+local initialSnapshot = readPetsSnapshotFromPlayerData()
+if initialSnapshot then
+	setPetsSnapshot(initialSnapshot)
+	rebuildFollowers()
+end
 refreshAll()

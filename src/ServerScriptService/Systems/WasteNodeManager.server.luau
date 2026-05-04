@@ -311,10 +311,11 @@ local function hasEquippedNativeTool(player, toolId)
 	return tool ~= nil and tool:IsA("Tool") and tool:GetAttribute("GEINativeTool") == true
 end
 
-local function isFarFromPlayers(position)
+local function isFarFromPlayers(position, minDistance)
+	minDistance = minDistance or GameData.Spawn.MinDistanceFromPlayers
 	for _, player in ipairs(Players:GetPlayers()) do
 		local root = getRootPart(player)
-		if root and (root.Position - position).Magnitude < GameData.Spawn.MinDistanceFromPlayers then
+		if root and (root.Position - position).Magnitude < minDistance then
 			return false
 		end
 	end
@@ -322,11 +323,12 @@ local function isFarFromPlayers(position)
 	return true
 end
 
-local function isFarFromWaste(position, wasteZone)
+local function isFarFromWaste(position, wasteZone, minDistance)
+	minDistance = minDistance or GameData.Spawn.MinDistanceBetweenWaste
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
 		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
 			local center = getWasteCenter(wasteModel)
-			if center and (center - position).Magnitude < GameData.Spawn.MinDistanceBetweenWaste then
+			if center and (center - position).Magnitude < minDistance then
 				return false
 			end
 		end
@@ -346,6 +348,13 @@ local function countActiveWaste(wasteZone)
 	return count
 end
 
+local function getAdaptiveSpawnDistances(surface)
+	local shortestSide = math.max(1, math.min(surface.Size.X, surface.Size.Z))
+	local playerDistance = math.min(GameData.Spawn.MinDistanceFromPlayers or 12, math.max(4, shortestSide * 0.25))
+	local wasteDistance = math.min(GameData.Spawn.MinDistanceBetweenWaste or 8, math.max(3, shortestSide * 0.16))
+	return playerDistance, wasteDistance
+end
+
 local function getTargetWasteCount(surface)
 	local spawnConfig = GameData.Spawn
 	local density = spawnConfig.DensityPerStud or 0.003
@@ -360,6 +369,7 @@ local function findSpawnPosition(surface, wasteZone)
 	local halfX = math.max(1, surface.Size.X / 2 - margin)
 	local halfZ = math.max(1, surface.Size.Z / 2 - margin)
 	local surfaceTopY = surface.Position.Y + surface.Size.Y / 2
+	local playerDistance, wasteDistance = getAdaptiveSpawnDistances(surface)
 
 	for _ = 1, GameData.Spawn.MaxSpawnAttempts do
 		local position = Vector3.new(
@@ -368,7 +378,19 @@ local function findSpawnPosition(surface, wasteZone)
 			surface.Position.Z + random:NextNumber(-halfZ, halfZ)
 		)
 
-		if isFarFromPlayers(position) and isFarFromWaste(position, wasteZone) then
+		if isFarFromPlayers(position, playerDistance) and isFarFromWaste(position, wasteZone, wasteDistance) then
+			return position
+		end
+	end
+
+	for _ = 1, GameData.Spawn.MaxSpawnAttempts do
+		local position = Vector3.new(
+			surface.Position.X + random:NextNumber(-halfX, halfX),
+			surfaceTopY,
+			surface.Position.Z + random:NextNumber(-halfZ, halfZ)
+		)
+
+		if isFarFromPlayers(position, 3) and isFarFromWaste(position, wasteZone, math.max(2.5, wasteDistance * 0.65)) then
 			return position
 		end
 	end

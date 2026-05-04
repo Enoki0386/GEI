@@ -14,7 +14,7 @@ local purchaseResultRemote = remotes:WaitForChild("PurchaseResult", 10)
 local petHatchResultRemote = remotes:WaitForChild("PetHatchResult", 10)
 local petInventoryUpdatedRemote = remotes:WaitForChild("PetInventoryUpdated", 10)
 local playerGui = player:WaitForChild("PlayerGui", 10)
-local playerData = player:WaitForChild("PlayerData", 10)
+local playerData = player:WaitForChild("PlayerData", 60)
 if not tutorialRemote or not playerGui or not playerData then
 	warn("[GEI] TutorialClient could not find required objects.")
 	return

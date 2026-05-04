@@ -34,7 +34,7 @@ local shopStateRemote = remotes:WaitForChild("ShopState", 10)
 local purchaseResultRemote = remotes:WaitForChild("PurchaseResult", 10)
 local playerDataRemote = remotes:WaitForChild("PlayerDataUpdate", 10)
 local playerGui = player:WaitForChild("PlayerGui", 10)
-local playerData = player:WaitForChild("PlayerData", 10)
+local playerData = player:WaitForChild("PlayerData", 60)
 
 if not buyItemRemote or not equipItemRemote or not shopStateRemote or not playerGui or not playerData then
 	warn("[GEI] ShopClient could not find required objects.")
@@ -771,7 +771,7 @@ for _, descendant in ipairs(playerData:GetDescendants()) do
 	end
 end
 
-local leaderstats = player:WaitForChild("leaderstats", 10)
+local leaderstats = player:WaitForChild("leaderstats", 60)
 if leaderstats then
 	leaderstats.DescendantAdded:Connect(function(descendant)
 		if descendant:IsA("ValueBase") then

@@ -2,6 +2,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local workspaceUtilModule = sharedFolder and sharedFolder:WaitForChild("WorkspaceUtil", 10)
+local WorkspaceUtil = workspaceUtilModule and require(workspaceUtilModule)
 local playersInside = {}
 local zoneWarningShown = false
 
@@ -42,14 +45,20 @@ local function ensureRemote(remoteName)
 end
 
 local function getZone()
-	local zone = Workspace:FindFirstChild("BuyZone")
+	local zone, path
+	if WorkspaceUtil then
+		zone, path = WorkspaceUtil.Find("BuyZone", { "Areas" }, { SearchDescendants = true })
+	else
+		zone = Workspace:FindFirstChild("BuyZone")
+		path = "Workspace.BuyZone"
+	end
 	if zone and zone:IsA("BasePart") then
 		return zone
 	end
 
 	if not zoneWarningShown then
 		if zone then
-			warn("[ShopManager] Workspace.BuyZone exists but must be a Part/BasePart. Shop zone entry is disabled until this is fixed.")
+			warn("[ShopManager] " .. (path or "Workspace.BuyZone") .. " exists but must be a Part/BasePart. Shop zone entry is disabled until this is fixed.")
 		else
 			warn("[ShopManager] Missing Workspace.BuyZone. Create a Part named BuyZone. Recommended size: 20, 1, 16.")
 		end

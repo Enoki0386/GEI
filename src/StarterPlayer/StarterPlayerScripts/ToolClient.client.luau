@@ -29,7 +29,7 @@ end
 
 local requestAttackRemote = remotes:WaitForChild("RequestAttack", 10)
 local attackFeedbackRemote = remotes:WaitForChild("AttackFeedback", 10)
-local playerData = player:WaitForChild("PlayerData", 10)
+local playerData = player:WaitForChild("PlayerData", 60)
 
 if not requestAttackRemote or not playerData then
 	warn("[GEI] ToolClient could not find required remotes or PlayerData.")

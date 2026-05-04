@@ -38,10 +38,14 @@ local attackFeedbackRemote = remotes:WaitForChild("AttackFeedback", 20)
 local playerDataRemote = remotes:WaitForChild("PlayerDataUpdate", 20)
 
 local playerGui = player:WaitForChild("PlayerGui", 20)
-local playerData = player:WaitForChild("PlayerData", 25)
-if not playerGui or not playerData then
-	warn("[GEI] PlayerGui or PlayerData missing. ClientManager stopped.")
+local playerData = player:FindFirstChild("PlayerData")
+if not playerGui then
+	warn("[GEI] PlayerGui missing. ClientManager stopped.")
 	return
+end
+
+if not playerData then
+	warn("[GEI] PlayerData is not ready yet. HUD will show safe defaults until data arrives.")
 end
 
 local gui = playerGui:FindFirstChild("MainHUD")
@@ -236,11 +240,19 @@ new("UITextSizeConstraint", {
 }, floatingText)
 
 local function getValue(name)
+	if not playerData then
+		return 0
+	end
+
 	local valueObject = playerData:FindFirstChild(name)
 	return valueObject and valueObject.Value or 0
 end
 
 local function getOwnedTools()
+	if not playerData then
+		return { "Brush" }
+	end
+
 	local ownedTools = playerData:FindFirstChild("OwnedTools")
 	local result = {}
 	if not ownedTools then
@@ -282,9 +294,9 @@ local function refreshToolbar()
 	end
 
 	local ownedTools = getOwnedTools()
-	local equippedToolValue = playerData:FindFirstChild("EquippedTool")
+	local equippedToolValue = playerData and playerData:FindFirstChild("EquippedTool")
 	local equippedTool = equippedToolValue and equippedToolValue.Value or "Brush"
-	local isToolEquippedValue = playerData:FindFirstChild("IsToolEquipped")
+	local isToolEquippedValue = playerData and playerData:FindFirstChild("IsToolEquipped")
 	local isToolEquipped = isToolEquippedValue and isToolEquippedValue.Value == true
 	local slotCount = math.max(1, #ownedTools)
 	local toolbarWidth = math.max(112, slotCount * 90 + 20)
@@ -482,10 +494,25 @@ local function bindValueSignals(parent)
 	end)
 end
 
-bindValueSignals(playerData)
+if playerData then
+	bindValueSignals(playerData)
+end
 local leaderstats = player:WaitForChild("leaderstats", 20)
 if leaderstats then
 	bindValueSignals(leaderstats)
+end
+
+if not playerData then
+	task.spawn(function()
+		local dataFolder = player:WaitForChild("PlayerData", 60)
+		if dataFolder then
+			playerData = dataFolder
+			bindValueSignals(dataFolder)
+			refreshAll()
+		else
+			warn("[GEI] PlayerData still missing after timeout. HUD remains in fallback mode.")
+		end
+	end)
 end
 
 if playerDataRemote then
