@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local gameDataModule = ReplicatedStorage:WaitForChild("GameData", 10)
@@ -15,6 +16,12 @@ local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 
 local SoundUtil = soundUtilModule and require(soundUtilModule)
 local uiIconUtilsModule = sharedFolder and sharedFolder:WaitForChild("UIIconUtils", 10)
 local UIIconUtils = uiIconUtilsModule and require(uiIconUtilsModule)
+local notificationModule = sharedFolder and sharedFolder:WaitForChild("NotificationClient", 10)
+local NotificationClient = notificationModule and require(notificationModule)
+local numberFormatModule = sharedFolder and sharedFolder:WaitForChild("NumberFormat", 10)
+local NumberFormat = numberFormatModule and require(numberFormatModule)
+local buttonEffectsModule = sharedFolder and sharedFolder:WaitForChild("ButtonEffects", 10)
+local ButtonEffects = buttonEffectsModule and require(buttonEffectsModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ShopClient stopped.")
@@ -43,16 +50,7 @@ local function new(className, properties, parent)
 	return instance
 end
 
-local function formatNumber(value)
-	value = math.floor(tonumber(value) or 0)
-	if value >= 1000000 then
-		return string.format("%.1fM", value / 1000000)
-	elseif value >= 1000 then
-		return string.format("%.1fK", value / 1000)
-	end
-
-	return tostring(value)
-end
+local formatNumber = NumberFormat and NumberFormat.Compact or tostring
 
 local function getLeaderCash()
 	local leaderstats = player:FindFirstChild("leaderstats")
@@ -82,14 +80,14 @@ local function getStatus(category, itemId, config)
 	local owned = ownsItem(category, itemId)
 	local equipped = isEquipped(category, itemId)
 	if equipped then
-		return "Equipe", Color3.fromRGB(77, 172, 104)
+		return "Equipped", Color3.fromRGB(77, 172, 104)
 	elseif owned then
-		return "Equiper", Color3.fromRGB(75, 121, 219)
+		return "Equip", Color3.fromRGB(75, 121, 219)
 	elseif getLeaderCash() >= config.Price then
-		return "Acheter", Color3.fromRGB(58, 174, 97)
+		return "Buy", Color3.fromRGB(58, 174, 97)
 	end
 
-	return "Acheter", Color3.fromRGB(119, 127, 132)
+	return "Buy", Color3.fromRGB(119, 127, 132)
 end
 
 local function getConfig(category, itemId)
@@ -146,6 +144,22 @@ new("UISizeConstraint", {
 local panelScale = new("UIScale", {
 	Scale = 0.92,
 }, panel)
+local panelTargetScale = 1
+
+local function getViewportSize()
+	local camera = Workspace.CurrentCamera
+	return camera and camera.ViewportSize or Vector2.new(1280, 720)
+end
+
+local function applyResponsiveShop()
+	local viewport = getViewportSize()
+	local safeSize = Vector2.new(math.max(320, viewport.X - 24), math.max(360, viewport.Y - 24))
+	local baseSize = Vector2.new(640, 420)
+	panelTargetScale = math.clamp(math.min(safeSize.X / baseSize.X, safeSize.Y / baseSize.Y), 0.55, 1)
+	if overlay.Visible then
+		panelScale.Scale = panelTargetScale
+	end
+end
 
 local title = new("TextLabel", {
 	BackgroundTransparency = 1,
@@ -165,40 +179,27 @@ new("UITextSizeConstraint", {
 local closeButton = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 0),
 	AutoButtonColor = true,
-	BackgroundColor3 = Color3.fromRGB(218, 226, 225),
+	BackgroundColor3 = Color3.fromRGB(54, 62, 67),
 	BorderSizePixel = 0,
 	Font = Enum.Font.GothamBold,
 	Position = UDim2.new(1, -18, 0, 18),
 	Size = UDim2.fromOffset(38, 38),
 	Text = "X",
-	TextColor3 = Color3.fromRGB(35, 41, 43),
+	TextColor3 = Color3.fromRGB(235, 241, 244),
 	TextScaled = true,
 }, panel)
 new("UICorner", { CornerRadius = UDim.new(0, 12) }, closeButton)
+if ButtonEffects then
+	ButtonEffects.Apply(closeButton, {
+		NormalColor = Color3.fromRGB(54, 62, 67),
+		HoverColor = Color3.fromRGB(67, 76, 82),
+		PressColor = Color3.fromRGB(38, 45, 50),
+	})
+end
 new("UITextSizeConstraint", {
 	MaxTextSize = 20,
 	MinTextSize = 10,
 }, closeButton)
-
-local notification = new("TextLabel", {
-	AnchorPoint = Vector2.new(0.5, 0),
-	BackgroundColor3 = Color3.fromRGB(24, 30, 33),
-	BackgroundTransparency = 0.05,
-	BorderSizePixel = 0,
-	Font = Enum.Font.GothamBold,
-	Position = UDim2.new(0.5, 0, 0, 18),
-	Size = UDim2.fromOffset(360, 34),
-	Text = "",
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	TextScaled = true,
-	Visible = false,
-	ZIndex = 5,
-}, overlay)
-new("UICorner", { CornerRadius = UDim.new(0, 12) }, notification)
-new("UITextSizeConstraint", {
-	MaxTextSize = 16,
-	MinTextSize = 9,
-}, notification)
 
 local tabs = new("Frame", {
 	BackgroundTransparency = 1,
@@ -305,11 +306,17 @@ local detailAction = new("TextButton", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.new(0.5, 0, 1, -18),
 	Size = UDim2.new(1, -36, 0, 42),
-	Text = "Acheter",
+	Text = "Buy",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 }, detailsPanel)
 new("UICorner", { CornerRadius = UDim.new(0, 14) }, detailAction)
+if ButtonEffects then
+	ButtonEffects.Apply(detailAction, {
+		NormalColor = Color3.fromRGB(58, 174, 97),
+		DisabledColor = Color3.fromRGB(87, 96, 101),
+	})
+end
 new("UITextSizeConstraint", {
 	MaxTextSize = 18,
 	MinTextSize = 10,
@@ -319,31 +326,13 @@ local activeTab = "Tools"
 local selectedCategory = "Tool"
 local selectedItemId = "Brush"
 local tabButtons = {}
-local notificationTween = nil
-
 local function showNotification(text, color)
-	if notificationTween then
-		notificationTween:Cancel()
+	if NotificationClient then
+		NotificationClient.Show(text, {
+			Type = color == Color3.fromRGB(255, 177, 137) and "Error" or "Success",
+			Color = color,
+		})
 	end
-
-	notification.Text = text
-	notification.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-	notification.Visible = true
-	notification.TextTransparency = 0
-	notification.BackgroundTransparency = 0.05
-
-	local tween = TweenService:Create(notification, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 1.35), {
-		TextTransparency = 1,
-		BackgroundTransparency = 1,
-	})
-	notificationTween = tween
-	tween:Play()
-	tween.Completed:Connect(function()
-		if notificationTween == tween then
-			notification.Visible = false
-			notificationTween = nil
-		end
-	end)
 end
 
 local function clearDetailsStats()
@@ -417,17 +406,24 @@ local function refreshDetails()
 	clearDetailsStats()
 
 	if selectedCategory == "Tool" then
-		addDetailRow("Degats", tostring(config.Damage), 1)
-		addDetailRow("Delai", string.format("%.2fs", config.Cooldown or 0), 2)
+		addDetailRow("Damage", tostring(config.Damage), 1)
+		addDetailRow("Cooldown", string.format("%.2fs", config.Cooldown or 0), 2)
 	else
-		addDetailRow("Capacite", formatNumber(config.Capacity), 1)
+		addDetailRow("Capacity", formatNumber(config.Capacity), 1)
 	end
-	addDetailRow("Prix", config.Price <= 0 and "Gratuit" or formatNumber(config.Price) .. " Cash", 10, config.Price > 0 and "Cash" or nil)
+	addDetailRow("Price", config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash", 10, config.Price > 0 and "Cash" or nil)
 
 	local buttonText, buttonColor = getStatus(selectedCategory, selectedItemId, config)
 	detailAction.Text = buttonText
 	detailAction.BackgroundColor3 = buttonColor
-	detailAction.AutoButtonColor = buttonText ~= "Equipe"
+	detailAction.AutoButtonColor = buttonText ~= "Equipped"
+	if ButtonEffects then
+		ButtonEffects.SetState(detailAction, {
+			NormalColor = buttonColor,
+			Disabled = buttonText == "Equipped",
+			DisabledColor = Color3.fromRGB(87, 96, 101),
+		})
+	end
 end
 
 local function clearGrid()
@@ -474,6 +470,13 @@ local function createItemCard(category, itemId, config, layoutOrder)
 		LayoutOrder = layoutOrder,
 		Text = "",
 	}, gridHolder)
+	if ButtonEffects then
+		ButtonEffects.Apply(card, {
+			NormalColor = selected and Color3.fromRGB(252, 255, 246) or Color3.fromRGB(255, 255, 255),
+			HoverColor = selected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(242, 248, 246),
+			PressColor = Color3.fromRGB(228, 236, 234),
+		})
+	end
 	new("UICorner", { CornerRadius = UDim.new(0, 16) }, card)
 	new("UIStroke", {
 		Color = selected and config.Color or (equipped and Color3.fromRGB(70, 196, 112) or Color3.fromRGB(214, 221, 222)),
@@ -506,9 +509,9 @@ local function createItemCard(category, itemId, config, layoutOrder)
 
 	local statText
 	if category == "Tool" then
-		statText = tostring(config.Damage) .. " degats"
+		statText = tostring(config.Damage) .. " Damage"
 	else
-		statText = formatNumber(config.Capacity) .. " capacite"
+		statText = formatNumber(config.Capacity) .. " Capacity"
 	end
 
 	local stats = new("TextLabel", {
@@ -546,7 +549,7 @@ local function createItemCard(category, itemId, config, layoutOrder)
 		Font = Enum.Font.GothamBold,
 		Position = priceHasIcon and UDim2.fromOffset(32, 91) or UDim2.fromOffset(12, 91),
 		Size = priceHasIcon and UDim2.new(1, -44, 0, 22) or UDim2.new(1, -24, 0, 22),
-		Text = config.Price <= 0 and "Gratuit" or formatNumber(config.Price) .. " Cash",
+		Text = config.Price <= 0 and "Free" or formatNumber(config.Price) .. " Cash",
 		TextColor3 = Color3.fromRGB(36, 116, 64),
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -557,7 +560,7 @@ local function createItemCard(category, itemId, config, layoutOrder)
 	}, price)
 
 	local action = new("TextButton", {
-		AutoButtonColor = buttonText ~= "Equipe",
+		AutoButtonColor = buttonText ~= "Equipped",
 		BackgroundColor3 = buttonColor,
 		BorderSizePixel = 0,
 		Font = Enum.Font.GothamBlack,
@@ -568,6 +571,13 @@ local function createItemCard(category, itemId, config, layoutOrder)
 		TextScaled = true,
 	}, card)
 	new("UICorner", { CornerRadius = UDim.new(0, 10) }, action)
+	if ButtonEffects then
+		ButtonEffects.Apply(action, {
+			NormalColor = buttonColor,
+			Disabled = buttonText == "Equipped",
+			DisabledColor = Color3.fromRGB(92, 101, 106),
+		})
+	end
 	new("UITextSizeConstraint", {
 		MaxTextSize = 14,
 		MinTextSize = 8,
@@ -578,6 +588,9 @@ local function createItemCard(category, itemId, config, layoutOrder)
 	end)
 
 	action.Activated:Connect(function()
+		if ButtonEffects and not ButtonEffects.IsEnabled(action) then
+			return
+		end
 		selectItem(category, itemId)
 		triggerSelectedAction()
 	end)
@@ -586,14 +599,19 @@ end
 local function refreshTabs()
 	for tabName, button in pairs(tabButtons) do
 		local selected = tabName == activeTab
-		button.BackgroundColor3 = selected and Color3.fromRGB(37, 44, 48) or Color3.fromRGB(220, 228, 228)
+		local buttonColor = selected and Color3.fromRGB(37, 44, 48) or Color3.fromRGB(220, 228, 228)
+		button.BackgroundColor3 = buttonColor
 		button.TextColor3 = selected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(39, 45, 48)
+		if ButtonEffects then
+			ButtonEffects.SetState(button, { NormalColor = buttonColor })
+		end
 	end
 end
 
 local function refreshGrid()
 	clearGrid()
 	refreshTabs()
+	applyResponsiveShop()
 
 	if activeTab == "Tools" then
 		for index, toolId in ipairs(GameData.ToolOrder) do
@@ -621,6 +639,9 @@ local function createTab(tabName, text, category, firstItemId, layoutOrder)
 		TextScaled = true,
 	}, tabs)
 	new("UICorner", { CornerRadius = UDim.new(0, 13) }, button)
+	if ButtonEffects then
+		ButtonEffects.Apply(button, { NormalColor = Color3.fromRGB(220, 228, 228) })
+	end
 	new("UITextSizeConstraint", {
 		MaxTextSize = 17,
 		MinTextSize = 9,
@@ -638,7 +659,12 @@ end
 createTab("Tools", "Outils", "Tool", GameData.ToolOrder[1], 1)
 createTab("Backpacks", "Sacs", "Backpack", GameData.BackpackOrder[1], 2)
 
-detailAction.Activated:Connect(triggerSelectedAction)
+detailAction.Activated:Connect(function()
+	if ButtonEffects and not ButtonEffects.IsEnabled(detailAction) then
+		return
+	end
+	triggerSelectedAction()
+end)
 
 local openTween = nil
 local function openShop()
@@ -647,9 +673,10 @@ local function openShop()
 	end
 
 	overlay.Visible = true
-	panelScale.Scale = 0.88
+	applyResponsiveShop()
+	panelScale.Scale = panelTargetScale * 0.88
 	openTween = TweenService:Create(panelScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Scale = 1,
+		Scale = panelTargetScale,
 	})
 	refreshGrid()
 	openTween:Play()
@@ -661,7 +688,7 @@ local function closeShop()
 	end
 
 	local tween = TweenService:Create(panelScale, TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-		Scale = 0.9,
+		Scale = panelTargetScale * 0.9,
 	})
 	tween:Play()
 	tween.Completed:Connect(function()
@@ -670,6 +697,11 @@ local function closeShop()
 end
 
 closeButton.Activated:Connect(closeShop)
+
+local camera = Workspace.CurrentCamera
+if camera then
+	camera:GetPropertyChangedSignal("ViewportSize"):Connect(applyResponsiveShop)
+end
 
 shopStateRemote.OnClientEvent:Connect(function(isOpen)
 	if isOpen then
@@ -692,13 +724,16 @@ if purchaseResultRemote then
 
 		if ok then
 			if reason == "Bought" then
-				showNotification(itemName .. " achete.", Color3.fromRGB(136, 255, 164))
+				if SoundUtil then
+					SoundUtil.Play("Coin", GameData, playerGui)
+				end
+				showNotification(itemName .. " acheté.", Color3.fromRGB(136, 255, 164))
 			elseif reason == "Equipped" then
-				showNotification(itemName .. " equipe.", Color3.fromRGB(179, 212, 255))
+				showNotification(itemName .. " équipé.", Color3.fromRGB(179, 212, 255))
 			elseif reason == "Unequipped" then
-				showNotification(itemName .. " retire.", Color3.fromRGB(207, 218, 222))
+				showNotification(itemName .. " retiré.", Color3.fromRGB(207, 218, 222))
 			else
-				showNotification(itemName .. " mis a jour.", Color3.fromRGB(220, 235, 255))
+				showNotification(itemName .. " mis à jour.", Color3.fromRGB(220, 235, 255))
 			end
 		else
 			if SoundUtil then
@@ -707,11 +742,13 @@ if purchaseResultRemote then
 
 			local message = "Achat impossible : " .. itemName
 			if reason == "NotEnoughCash" then
-				message = "Pas assez de Cash pour " .. itemName
+				message = "Pas assez de Cash."
+			elseif reason == "NotEnoughDiamonds" then
+				message = "Pas assez de Diamonds."
 			elseif reason == "UnknownCategory" then
-				message = "Categorie de boutique invalide"
+				message = "Catégorie de boutique invalide."
 			elseif reason == "DataMissing" then
-				message = "Donnees joueur pas encore pretes"
+				message = "Données joueur pas encore prêtes."
 			end
 			warn("[ShopClient]", message, "reason:", reason)
 			showNotification(message, Color3.fromRGB(255, 177, 137))

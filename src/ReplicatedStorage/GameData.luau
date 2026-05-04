@@ -19,7 +19,9 @@ GameData.Admin = {
 
 GameData.Spawn = {
 	SurfaceName = "SpawnSurface1",
+	SurfaceFolders = { "SpawnSurfaces" },
 	WasteZoneName = "WasteZone",
+	WasteZoneFolders = {},
 	DensityPerStud = 0.003,
 	MinNodes = 8,
 	MaxNodes = 60,
@@ -33,6 +35,13 @@ GameData.Player = {
 	WalkSpeed = 22,
 }
 
+GameData.RarityColors = {
+	Common = Color3.fromRGB(80, 255, 120),
+	Rare = Color3.fromRGB(80, 170, 255),
+	Epic = Color3.fromRGB(190, 90, 255),
+	Legendary = Color3.fromRGB(255, 210, 60),
+}
+
 GameData.WasteDisplay = {
 	BillboardMaxDistance = 45,
 	BillboardSize = Vector2.new(180, 78),
@@ -41,12 +50,7 @@ GameData.WasteDisplay = {
 	HitShakeDistance = 0.18,
 	HitScaleAmount = 1.08,
 	HitTweenTime = 0.08,
-	RarityColors = {
-		Common = Color3.fromRGB(80, 255, 120),
-		Rare = Color3.fromRGB(80, 170, 255),
-		Epic = Color3.fromRGB(190, 90, 255),
-		Legendary = Color3.fromRGB(255, 210, 60),
-	},
+	RarityColors = GameData.RarityColors,
 }
 
 local DEFAULT_WASTE_MODEL_TUNING = {
@@ -195,12 +199,7 @@ GameData.Pets = {
 		DamageMultiplier = 1,
 		BackpackMultiplier = 1,
 	},
-	RarityColors = {
-		Common = Color3.fromRGB(80, 255, 120),
-		Rare = Color3.fromRGB(80, 170, 255),
-		Epic = Color3.fromRGB(190, 90, 255),
-		Legendary = Color3.fromRGB(255, 210, 60),
-	},
+	RarityColors = GameData.RarityColors,
 }
 
 GameData.Eggs = {
@@ -561,6 +560,10 @@ function GameData.GetPet(petId)
 	end
 
 	return nil
+end
+
+function GameData.GetRarityColor(rarity)
+	return GameData.RarityColors[rarity] or Color3.fromRGB(255, 255, 255)
 end
 
 function GameData.GetCashForWaste(wasteAmount)

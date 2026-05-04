@@ -4,6 +4,7 @@ local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local SHOW_EXTERNAL_INDEX_BUTTON = false
 local GameData = require(ReplicatedStorage:WaitForChild("GameData"))
 
 local function new(className, props, parent)
@@ -26,6 +27,7 @@ gui = new("ScreenGui", {
 
 local button = new("TextButton", {
 	AnchorPoint = Vector2.new(1, 1),
+	Active = SHOW_EXTERNAL_INDEX_BUTTON,
 	BackgroundColor3 = Color3.fromRGB(24, 30, 35),
 	BackgroundTransparency = 0.08,
 	BorderSizePixel = 0,
@@ -35,6 +37,7 @@ local button = new("TextButton", {
 	Text = "Index",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
+	Visible = SHOW_EXTERNAL_INDEX_BUTTON,
 }, gui)
 new("UICorner", { CornerRadius = UDim.new(0, 14) }, button)
 

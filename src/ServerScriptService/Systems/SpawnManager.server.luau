@@ -8,20 +8,29 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local workspaceUtilModule = sharedFolder and sharedFolder:WaitForChild("WorkspaceUtil", 10)
+local WorkspaceUtil = workspaceUtilModule and require(workspaceUtilModule)
 
 local function waitForRequiredPart(name, recommendedSize)
 	local warned = false
 
 	while true do
-		local part = Workspace:FindFirstChild(name)
+		local part, path
+		if WorkspaceUtil then
+			part, path = WorkspaceUtil.Find(name, GameData.Spawn.SurfaceFolders, { SearchDescendants = false })
+		else
+			part = Workspace:FindFirstChild(name)
+			path = "Workspace." .. name
+		end
 		if part and part:IsA("BasePart") then
 			return part
 		end
 
 		if not warned then
 			warn(
-				"[SpawnManager] Missing Workspace."
-					.. name
+				"[SpawnManager] Missing "
+					.. (path or ("Workspace." .. name))
 					.. ". Create this Part manually in Roblox Studio. Recommended size: "
 					.. tostring(recommendedSize.X)
 					.. ", "

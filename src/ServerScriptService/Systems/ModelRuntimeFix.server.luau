@@ -8,6 +8,9 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local workspaceUtilModule = sharedFolder and sharedFolder:WaitForChild("WorkspaceUtil", 10)
+local WorkspaceUtil = workspaceUtilModule and require(workspaceUtilModule)
 local warned = {}
 
 local function warnOnce(key, message)
@@ -290,7 +293,12 @@ local function applyRuntimeFix(wasteModel)
 end
 
 local function getWasteZone()
-	return Workspace:FindFirstChild((GameData.Spawn and GameData.Spawn.WasteZoneName) or "WasteZone")
+	local spawnConfig = GameData.Spawn or {}
+	if WorkspaceUtil then
+		return WorkspaceUtil.Find(spawnConfig.WasteZoneName or "WasteZone", spawnConfig.WasteZoneFolders, { SearchDescendants = false })
+	end
+
+	return Workspace:FindFirstChild(spawnConfig.WasteZoneName or "WasteZone")
 end
 
 task.spawn(function()

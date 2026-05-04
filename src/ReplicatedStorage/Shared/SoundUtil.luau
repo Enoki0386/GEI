@@ -6,6 +6,14 @@ local SOUND_ALIASES = {
 	WasteHit = "Hit",
 	WasteBreak = "Break",
 }
+local SOUND_COOLDOWNS = {
+	Hit = 0.08,
+	Break = 0.12,
+	Sell = 0.35,
+	Error = 0.4,
+	Coin = 0.25,
+}
+local lastPlayedAt = {}
 
 local function isUsableSoundId(soundId)
 	return type(soundId) == "string"
@@ -46,7 +54,32 @@ local function getSoundAsset(soundName)
 	return nil
 end
 
+local function getCanonicalSoundName(soundName)
+	return SOUND_ALIASES[soundName] or soundName
+end
+
+local function canPlay(soundName)
+	local canonicalName = getCanonicalSoundName(soundName)
+	local cooldown = SOUND_COOLDOWNS[canonicalName] or 0
+	if cooldown <= 0 then
+		return true
+	end
+
+	local now = os.clock()
+	local lastPlayed = lastPlayedAt[canonicalName] or 0
+	if now - lastPlayed < cooldown then
+		return false
+	end
+
+	lastPlayedAt[canonicalName] = now
+	return true
+end
+
 function SoundUtil.Play(soundName, gameData, parent, volume)
+	if type(soundName) ~= "string" or soundName == "" or not canPlay(soundName) then
+		return nil
+	end
+
 	local source = getSoundAsset(soundName)
 	local sound = nil
 

@@ -82,7 +82,7 @@ if playerGui then
 		BackgroundTransparency = 0.18,
 		BorderSizePixel = 0,
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(430, 214),
+		Size = UDim2.new(0.86, 0, 0, 214),
 	}, background)
 	new("UICorner", { CornerRadius = UDim.new(0, 22) }, panel)
 	new("UIStroke", {
@@ -95,6 +95,10 @@ if playerGui then
 		PaddingLeft = UDim.new(0, 30),
 		PaddingRight = UDim.new(0, 30),
 		PaddingTop = UDim.new(0, 28),
+	}, panel)
+	new("UISizeConstraint", {
+		MaxSize = Vector2.new(430, 214),
+		MinSize = Vector2.new(280, 190),
 	}, panel)
 
 	local title = new("TextLabel", {

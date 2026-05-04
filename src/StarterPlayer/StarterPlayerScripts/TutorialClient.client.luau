@@ -10,6 +10,9 @@ if not remotes then
 end
 
 local tutorialRemote = remotes:WaitForChild("TutorialProgress", 10)
+local purchaseResultRemote = remotes:WaitForChild("PurchaseResult", 10)
+local petHatchResultRemote = remotes:WaitForChild("PetHatchResult", 10)
+local petInventoryUpdatedRemote = remotes:WaitForChild("PetInventoryUpdated", 10)
 local playerGui = player:WaitForChild("PlayerGui", 10)
 local playerData = player:WaitForChild("PlayerData", 10)
 if not tutorialRemote or not playerGui or not playerData then
@@ -44,8 +47,8 @@ frame.AnchorPoint = Vector2.new(0.5, 1)
 frame.BackgroundColor3 = Color3.fromRGB(25, 29, 32)
 frame.BackgroundTransparency = 0.08
 frame.BorderSizePixel = 0
-frame.Position = UDim2.new(0.5, 0, 1, -116)
-frame.Size = UDim2.fromOffset(292, 38)
+frame.Position = UDim2.new(0.5, 0, 1, -118)
+frame.Size = UDim2.fromOffset(420, 42)
 frame.Visible = true
 frame:SetAttribute("GEITutorialManaged", true)
 frame.Parent = gui
@@ -60,14 +63,48 @@ stroke.Thickness = 1
 stroke.Transparency = 0.78
 stroke.Parent = frame
 
+local padding = Instance.new("UIPadding")
+padding.PaddingBottom = UDim.new(0, 7)
+padding.PaddingLeft = UDim.new(0, 11)
+padding.PaddingRight = UDim.new(0, 12)
+padding.PaddingTop = UDim.new(0, 7)
+padding.Parent = frame
+
+local layout = Instance.new("UIListLayout")
+layout.FillDirection = Enum.FillDirection.Horizontal
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.VerticalAlignment = Enum.VerticalAlignment.Center
+layout.Padding = UDim.new(0, 9)
+layout.Parent = frame
+
+local stepLabel = Instance.new("TextLabel")
+stepLabel.BackgroundColor3 = Color3.fromRGB(255, 206, 76)
+stepLabel.BackgroundTransparency = 0.05
+stepLabel.BorderSizePixel = 0
+stepLabel.Font = Enum.Font.GothamBold
+stepLabel.LayoutOrder = 1
+stepLabel.Size = UDim2.fromOffset(45, 24)
+stepLabel.Text = "1/5"
+stepLabel.TextColor3 = Color3.fromRGB(28, 25, 20)
+stepLabel.TextSize = 13
+stepLabel.Parent = frame
+
+local stepCorner = Instance.new("UICorner")
+stepCorner.CornerRadius = UDim.new(0, 9)
+stepCorner.Parent = stepLabel
+
 local label = Instance.new("TextLabel")
 label.BackgroundTransparency = 1
 label.Font = Enum.Font.GothamBold
-label.Position = UDim2.fromOffset(12, 4)
-label.Size = UDim2.new(1, -24, 1, -8)
+label.LayoutOrder = 2
+label.Size = UDim2.new(1, -54, 1, 0)
 label.Text = ""
 label.TextColor3 = Color3.fromRGB(240, 244, 245)
-label.TextScaled = true
+label.TextScaled = false
+label.TextSize = 15
+label.TextWrapped = true
+label.TextXAlignment = Enum.TextXAlignment.Left
 label.Parent = frame
 
 local textConstraint = Instance.new("UITextSizeConstraint")
@@ -77,42 +114,99 @@ textConstraint.Parent = label
 
 local completed = {
 	ClickedWaste = false,
+	BackpackFilled = false,
 	SoldWaste = false,
 	OpenedShop = false,
+	BoughtItem = false,
+	HatchedEgg = false,
 }
 
-local currentText = nil
+local tutorialSteps = {
+	{ Key = "ClickedWaste", Text = "Clique sur un Waste Node pour le casser." },
+	{ Key = "BackpackFilled", Text = "Ton backpack se remplit." },
+	{ Key = "SoldWaste", Text = "Va à la SellZone pour vendre." },
+	{ Key = "BoughtItem", Text = "Achète de meilleurs outils au Shop." },
+	{ Key = "HatchedEgg", Text = "Ouvre des oeufs pour obtenir des pets bonus." },
+}
+
+local currentStepKey = nil
 
 local function getWasteCount()
 	local waste = playerData:FindFirstChild("WasteCount")
 	return waste and waste.Value or 0
 end
 
-local function getNextText()
-	if not completed.SoldWaste then
-		if getWasteCount() <= 0 then
-			return "Clique sur un dechet"
+local function hasBoughtUpgrade()
+	local ownedTools = playerData:FindFirstChild("OwnedTools")
+	if ownedTools then
+		for _, child in ipairs(ownedTools:GetChildren()) do
+			if child:IsA("BoolValue") and child.Value and child.Name ~= "Brush" then
+				return true
+			end
 		end
-		return "Vends tes dechets"
-	end
-	if not completed.OpenedShop then
-		return "Ouvre la boutique"
 	end
 
-	return nil
+	local ownedBackpacks = playerData:FindFirstChild("OwnedBackpacks")
+	if ownedBackpacks then
+		for _, child in ipairs(ownedBackpacks:GetChildren()) do
+			if child:IsA("BoolValue") and child.Value and child.Name ~= "SmallBag" then
+				return true
+			end
+		end
+	end
+
+	return false
 end
 
-local function setPrompt(text)
-	if currentText == text then
+local function hasAnyPet()
+	local petsFolder = playerData:FindFirstChild("Pets")
+	local inventory = petsFolder and petsFolder:FindFirstChild("Inventory")
+	return inventory ~= nil and #inventory:GetChildren() > 0
+end
+
+local function syncDerivedProgress()
+	if getWasteCount() > 0 then
+		completed.ClickedWaste = true
+		completed.BackpackFilled = true
+	end
+
+	if hasBoughtUpgrade() then
+		completed.BoughtItem = true
+	end
+
+	if hasAnyPet() then
+		completed.HatchedEgg = true
+	end
+end
+
+local function getNextStep()
+	syncDerivedProgress()
+
+	for index, step in ipairs(tutorialSteps) do
+		if not completed[step.Key] then
+			return step, index
+		end
+	end
+
+	return nil, nil
+end
+
+local function setPrompt(step, index)
+	local nextStepKey = step and step.Key or nil
+	if currentStepKey == nextStepKey then
 		return
 	end
 
-	currentText = text
-	if not text then
+	currentStepKey = nextStepKey
+	if not step then
 		local tween = TweenService:Create(frame, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			BackgroundTransparency = 1,
 		})
 		TweenService:Create(label, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			TextTransparency = 1,
+		}):Play()
+		TweenService:Create(stepLabel, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
 			TextTransparency = 1,
 		}):Play()
 		tween:Play()
@@ -125,15 +219,19 @@ local function setPrompt(text)
 	frame.Visible = true
 	frame.BackgroundTransparency = 0.08
 	label.TextTransparency = 0
-	label.Text = text
-	frame.Size = UDim2.fromOffset(270, 34)
+	stepLabel.BackgroundTransparency = 0.05
+	stepLabel.TextTransparency = 0
+	stepLabel.Text = string.format("%d/%d", index, #tutorialSteps)
+	label.Text = step.Text
+	frame.Size = UDim2.fromOffset(394, 38)
 	TweenService:Create(frame, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size = UDim2.fromOffset(292, 38),
+		Size = UDim2.fromOffset(420, 42),
 	}):Play()
 end
 
 local function refresh()
-	setPrompt(getNextText())
+	local step, index = getNextStep()
+	setPrompt(step, index)
 end
 
 tutorialRemote.OnClientEvent:Connect(function(stepName)
@@ -143,9 +241,43 @@ tutorialRemote.OnClientEvent:Connect(function(stepName)
 	end
 end)
 
+if purchaseResultRemote then
+	purchaseResultRemote.OnClientEvent:Connect(function(ok, reason)
+		if ok and reason == "Bought" then
+			completed.BoughtItem = true
+			refresh()
+		end
+	end)
+end
+
+if petHatchResultRemote then
+	petHatchResultRemote.OnClientEvent:Connect(function(response)
+		if type(response) == "table" and response.Success then
+			completed.HatchedEgg = true
+			refresh()
+		end
+	end)
+end
+
+if petInventoryUpdatedRemote then
+	petInventoryUpdatedRemote.OnClientEvent:Connect(refresh)
+end
+
 local wasteValue = playerData:WaitForChild("WasteCount", 10)
 if wasteValue then
 	wasteValue.Changed:Connect(refresh)
+end
+
+local ownedToolsFolder = playerData:FindFirstChild("OwnedTools")
+if ownedToolsFolder then
+	ownedToolsFolder.ChildAdded:Connect(refresh)
+	ownedToolsFolder.ChildRemoved:Connect(refresh)
+end
+
+local ownedBackpacksFolder = playerData:FindFirstChild("OwnedBackpacks")
+if ownedBackpacksFolder then
+	ownedBackpacksFolder.ChildAdded:Connect(refresh)
+	ownedBackpacksFolder.ChildRemoved:Connect(refresh)
 end
 
 refresh()

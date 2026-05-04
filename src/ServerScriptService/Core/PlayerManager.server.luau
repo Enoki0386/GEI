@@ -139,6 +139,7 @@ local function sanitizePetsData(petsData)
 					Level = math.max(1, math.floor(tonumber(petData.Level) or 1)),
 					Locked = petData.Locked == true,
 					Variant = type(petData.Variant) == "string" and petData.Variant or "Normal",
+					ObtainedAt = math.max(0, tonumber(petData.ObtainedAt) or 0),
 				})
 				result.Discovered[petData.PetId] = true
 			end
@@ -374,6 +375,7 @@ local function createPetFolder(petData, parent)
 	createValue("IntValue", "Level", petData.Level or 1, petFolder)
 	createValue("BoolValue", "Locked", petData.Locked == true, petFolder)
 	createValue("StringValue", "Variant", petData.Variant or "Normal", petFolder)
+	createValue("NumberValue", "ObtainedAt", petData.ObtainedAt or 0, petFolder)
 
 	return petFolder
 end
@@ -482,6 +484,7 @@ local function snapshotPets(dataFolder)
 				local level = petFolder:FindFirstChild("Level")
 				local locked = petFolder:FindFirstChild("Locked")
 				local variant = petFolder:FindFirstChild("Variant")
+				local obtainedAt = petFolder:FindFirstChild("ObtainedAt")
 				if uid and petId and GameData.GetPet(petId.Value) then
 					table.insert(pets.Inventory, {
 						Uid = uid.Value,
@@ -489,6 +492,7 @@ local function snapshotPets(dataFolder)
 						Level = level and level.Value or 1,
 						Locked = locked and locked.Value == true or false,
 						Variant = variant and variant.Value or "Normal",
+						ObtainedAt = obtainedAt and obtainedAt.Value or 0,
 					})
 					pets.Discovered[petId.Value] = true
 				end

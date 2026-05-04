@@ -153,6 +153,9 @@ local function ensurePetsFolder(player)
 				if not petFolder:FindFirstChild("Uid") then
 					createValue("StringValue", "Uid", petFolder.Name, petFolder)
 				end
+				if not petFolder:FindFirstChild("ObtainedAt") then
+					createValue("NumberValue", "ObtainedAt", 0, petFolder)
+				end
 				createValue("BoolValue", petId.Value, true, discovered)
 			end
 		end
@@ -209,6 +212,7 @@ local function readPetFolder(petFolder)
 	local level = petFolder:FindFirstChild("Level")
 	local locked = petFolder:FindFirstChild("Locked")
 	local variant = petFolder:FindFirstChild("Variant")
+	local obtainedAt = petFolder:FindFirstChild("ObtainedAt")
 	if not uid or not petId or not GameData.GetPet(petId.Value) then
 		return nil
 	end
@@ -219,6 +223,7 @@ local function readPetFolder(petFolder)
 		Level = level and level.Value or 1,
 		Locked = locked and locked.Value == true or false,
 		Variant = variant and variant.Value or "Normal",
+		ObtainedAt = obtainedAt and obtainedAt.Value or 0,
 	}
 end
 
@@ -312,6 +317,7 @@ local function addPetToInventory(player, petId, variant)
 	createValue("IntValue", "Level", 1, petFolder)
 	createValue("BoolValue", "Locked", false, petFolder)
 	createValue("StringValue", "Variant", variant or "Normal", petFolder)
+	createValue("NumberValue", "ObtainedAt", os.time(), petFolder)
 	markDiscovered(player, petId)
 
 	return readPetFolder(petFolder)
@@ -688,6 +694,10 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	task.defer(syncPlayer, player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	hatchCooldowns[player] = nil
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do

@@ -8,6 +8,9 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local workspaceUtilModule = sharedFolder and sharedFolder:WaitForChild("WorkspaceUtil", 10)
+local WorkspaceUtil = workspaceUtilModule and require(workspaceUtilModule)
 
 local REQUIREMENTS = {
 	{
@@ -18,8 +21,9 @@ local REQUIREMENTS = {
 		RecommendedSize = GameData.World.LobbyFloor.Size,
 	},
 	{
-		Path = "Workspace.SpawnSurface1",
+		Path = "Workspace.SpawnSurfaces.SpawnSurface1 or Workspace.SpawnSurface1",
 		Name = GameData.Spawn.SurfaceName,
+		FolderPaths = GameData.Spawn.SurfaceFolders,
 		ExpectedClass = "BasePart",
 		Instruction = "Create a Part named SpawnSurface1.",
 		RecommendedSize = GameData.World.SpawnSurface.Size,
@@ -54,18 +58,25 @@ local REQUIREMENTS = {
 }
 
 local OPTIONAL_REQUIREMENTS = {
-	"EggZone",
-	"EggPlaza",
-	"EggHatcher",
-	"VIPZone",
-	"Zone2Barrier",
-	"SpawnSurface2",
-	"MachineArea",
-	"SpawnSurface3",
-	"UpgradeShop2",
-	"SpawnSurface4",
-	"BossWasteArea",
-	"PortalDimension2",
+	{ Name = "EggPlaza" },
+	{ Name = "EggHatcher", FolderPaths = { "EggPlaza" } },
+	{ Name = "VIPZone", FolderPaths = { "Areas" } },
+	{ Name = "Zone2Barrier", FolderPaths = { "Barriers" } },
+	{ Name = "ZoneMachineBarrier", FolderPaths = { "Barriers" } },
+	{ Name = "Zone3Barrier", FolderPaths = { "Barriers" } },
+	{ Name = "Zone4Barrier", FolderPaths = { "Barriers" } },
+	{ Name = "Zone5Barrier", FolderPaths = { "Barriers" } },
+	{ Name = "SpawnSurface2", FolderPaths = { "SpawnSurfaces" } },
+	{ Name = "SpawnSurface3", FolderPaths = { "SpawnSurfaces" } },
+	{ Name = "SpawnSurface4", FolderPaths = { "SpawnSurfaces" } },
+	{ Name = "MachineArea" },
+	{ Name = "Recycler", FolderPaths = { "MachineArea" } },
+	{ Name = "Crusher", FolderPaths = { "MachineArea" } },
+	{ Name = "Compressor", FolderPaths = { "MachineArea" } },
+	{ Name = "Sorter", FolderPaths = { "MachineArea" } },
+	{ Name = "UpgradeShop2", FolderPaths = { "Areas" } },
+	{ Name = "BossWasteArea", FolderPaths = { "Areas" } },
+	{ Name = "PortalDimension2", FolderPaths = { "Areas" } },
 }
 
 local warnedMessages = {}
@@ -96,7 +107,13 @@ local function getTypeText(requirement)
 end
 
 local function validateRequirement(requirement)
-	local instance = Workspace:FindFirstChild(requirement.Name)
+	local instance, foundPath
+	if WorkspaceUtil then
+		instance, foundPath = WorkspaceUtil.Find(requirement.Name, requirement.FolderPaths, { SearchDescendants = false })
+	else
+		instance = Workspace:FindFirstChild(requirement.Name)
+		foundPath = requirement.Path
+	end
 	if not instance then
 		local sizeText = vectorToText(requirement.RecommendedSize)
 		local message = "[MapValidator] Missing " .. requirement.Path .. ". " .. requirement.Instruction
@@ -120,6 +137,8 @@ local function validateRequirement(requirement)
 				.. requirement.Path
 				.. " exists but must be "
 				.. getTypeText(requirement)
+				.. ". Found: "
+				.. tostring(foundPath or requirement.Path)
 				.. ". Rename or replace it in Roblox Studio."
 		)
 		return false
@@ -137,9 +156,15 @@ local function validateMap()
 	end
 
 	local missingOptional = {}
-	for _, optionalName in ipairs(OPTIONAL_REQUIREMENTS) do
-		if not Workspace:FindFirstChild(optionalName) then
-			table.insert(missingOptional, optionalName)
+	for _, optional in ipairs(OPTIONAL_REQUIREMENTS) do
+		local instance = nil
+		if WorkspaceUtil then
+			instance = WorkspaceUtil.Find(optional.Name, optional.FolderPaths, { SearchDescendants = false })
+		else
+			instance = Workspace:FindFirstChild(optional.Name)
+		end
+		if not instance then
+			table.insert(missingOptional, optional.Name)
 		end
 	end
 	if #missingOptional > 0 then
@@ -155,7 +180,7 @@ end
 
 validateMap()
 
-Workspace.ChildAdded:Connect(function(child)
+Workspace.DescendantAdded:Connect(function(child)
 	for _, requirement in ipairs(REQUIREMENTS) do
 		if child.Name == requirement.Name then
 			task.defer(validateMap)

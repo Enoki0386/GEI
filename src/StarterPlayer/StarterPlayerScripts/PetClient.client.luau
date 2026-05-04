@@ -1084,24 +1084,40 @@ local function playHatchAnimation(response)
 end
 
 local hatching = false
+local function setHatchPromptEnabled(enabled)
+	if not currentHatcherPart then
+		return
+	end
+
+	local prompt = currentHatcherPart:FindFirstChild("GEIEggPrompt")
+	if prompt and prompt:IsA("ProximityPrompt") then
+		prompt.Enabled = enabled
+	end
+end
+
 local function requestHatch()
-	if hatching then
+	if hatching or hatchInProgress then
 		return
 	end
 	hatching = true
-	if hatchInProgress then
-				return
-			end
-			hatchInProgress = true
-			prompt.Enabled = false
-			local response = invokePetRemote(hatchEggRemote, STARTER_EGG_ID)
-	hatching = false
+	hatchInProgress = true
+	setHatchPromptEnabled(false)
+
+	local response = invokePetRemote(hatchEggRemote, STARTER_EGG_ID)
 	if response.Success or response.Ok then
 		if SoundUtil then
 			SoundUtil.Play("Coin", GameData, playerGui)
 		end
-		task.spawn(playHatchAnimation, response)
+		task.spawn(function()
+			playHatchAnimation(response)
+			hatching = false
+			hatchInProgress = false
+			setHatchPromptEnabled(true)
+		end)
 	else
+		hatching = false
+		hatchInProgress = false
+		setHatchPromptEnabled(true)
 		local reason = response.Error or response.Reason
 		showMessage(getErrorMessage(reason), Color3.fromRGB(255, 177, 137))
 		if SoundUtil then

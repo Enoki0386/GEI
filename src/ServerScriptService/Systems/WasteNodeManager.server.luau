@@ -12,6 +12,9 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local workspaceUtilModule = sharedFolder and sharedFolder:WaitForChild("WorkspaceUtil", 10)
+local WorkspaceUtil = workspaceUtilModule and require(workspaceUtilModule)
 local random = Random.new()
 local attackCooldowns = {}
 local shownWarnings = {}
@@ -57,7 +60,13 @@ local function ensureRemote(remoteName)
 end
 
 local function getWasteZone()
-	local wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
+	local wasteZone, path
+	if WorkspaceUtil then
+		wasteZone, path = WorkspaceUtil.Find(GameData.Spawn.WasteZoneName, GameData.Spawn.WasteZoneFolders, { SearchDescendants = false })
+	else
+		wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
+		path = "Workspace." .. GameData.Spawn.WasteZoneName
+	end
 	if wasteZone and wasteZone:IsA("Folder") then
 		return wasteZone
 	end
@@ -65,7 +74,7 @@ local function getWasteZone()
 	if wasteZone then
 		warnOnce(
 			"WasteZoneWrongType",
-			"[WasteNodeManager] Workspace.WasteZone exists but must be a Folder. Replace it manually in Roblox Studio."
+			"[WasteNodeManager] " .. (path or "Workspace.WasteZone") .. " exists but must be a Folder. Replace it manually in Roblox Studio."
 		)
 	else
 		warnOnce(
@@ -78,7 +87,13 @@ local function getWasteZone()
 end
 
 local function getSpawnSurface()
-	local surface = Workspace:FindFirstChild(GameData.Spawn.SurfaceName)
+	local surface, path
+	if WorkspaceUtil then
+		surface, path = WorkspaceUtil.Find(GameData.Spawn.SurfaceName, GameData.Spawn.SurfaceFolders, { SearchDescendants = false })
+	else
+		surface = Workspace:FindFirstChild(GameData.Spawn.SurfaceName)
+		path = "Workspace." .. GameData.Spawn.SurfaceName
+	end
 	if surface and surface:IsA("BasePart") then
 		return surface
 	end
@@ -86,12 +101,12 @@ local function getSpawnSurface()
 	if surface then
 		warnOnce(
 			"SpawnSurfaceWrongType",
-			"[WasteNodeManager] Workspace.SpawnSurface1 exists but must be a Part/BasePart. Replace it manually in Roblox Studio."
+			"[WasteNodeManager] " .. (path or "Workspace.SpawnSurface1") .. " exists but must be a Part/BasePart. Replace it manually in Roblox Studio."
 		)
 	else
 		warnOnce(
 			"SpawnSurfaceMissing",
-			"[WasteNodeManager] Missing Workspace.SpawnSurface1. Create a Part named SpawnSurface1. Recommended size: 80, 1, 60."
+			"[WasteNodeManager] Missing Workspace.SpawnSurfaces.SpawnSurface1 or Workspace.SpawnSurface1. Create a Part named SpawnSurface1. Recommended size: 80, 1, 60."
 		)
 	end
 
@@ -363,8 +378,8 @@ end
 
 local function createBillboard(wasteModel, wasteConfig, maxHP, billboardBaseCenter, modelTuning)
 	local displayConfig = GameData.WasteDisplay
-	local rarityColors = displayConfig.RarityColors or {}
-	local rarityColor = rarityColors[wasteConfig.Rarity] or wasteConfig.AccentColor
+	local rarityColors = displayConfig.RarityColors or GameData.RarityColors or {}
+	local rarityColor = GameData.GetRarityColor and GameData.GetRarityColor(wasteConfig.Rarity) or rarityColors[wasteConfig.Rarity] or wasteConfig.AccentColor
 	local anchor = createOrUpdateBillboardAnchor(wasteModel, billboardBaseCenter)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "WasteBillboard"

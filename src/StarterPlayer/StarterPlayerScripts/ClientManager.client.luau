@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 pcall(function()
@@ -21,6 +22,10 @@ local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 
 local SoundUtil = soundUtilModule and require(soundUtilModule)
 local uiIconUtilsModule = sharedFolder and sharedFolder:WaitForChild("UIIconUtils", 20)
 local UIIconUtils = uiIconUtilsModule and require(uiIconUtilsModule)
+local notificationModule = sharedFolder and sharedFolder:WaitForChild("NotificationClient", 20)
+local NotificationClient = notificationModule and require(notificationModule)
+local numberFormatModule = sharedFolder and sharedFolder:WaitForChild("NumberFormat", 20)
+local NumberFormat = numberFormatModule and require(numberFormatModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ClientManager stopped.")
@@ -70,16 +75,7 @@ local function new(className, properties, parent)
 	return instance
 end
 
-local function formatNumber(value)
-	value = math.floor(tonumber(value) or 0)
-	if value >= 1000000 then
-		return string.format("%.1fM", value / 1000000)
-	elseif value >= 1000 then
-		return string.format("%.1fK", value / 1000)
-	end
-
-	return tostring(value)
-end
+local formatNumber = NumberFormat and NumberFormat.Compact or tostring
 
 local topStats = new("Frame", {
 	Name = "TopStats",
@@ -98,6 +94,7 @@ new("UIStroke", {
 	Thickness = 1,
 	Transparency = 0.82,
 }, topStats)
+local topStatsScale = new("UIScale", { Scale = 1 }, topStats)
 
 local statLayout = new("UIListLayout", {
 	FillDirection = Enum.FillDirection.Horizontal,
@@ -210,6 +207,7 @@ new("UIStroke", {
 	Thickness = 1,
 	Transparency = 0.62,
 }, toolbar)
+local toolbarScale = new("UIScale", { Scale = 1 }, toolbar)
 
 local slotsFrame = new("Frame", {
 	Name = "Slots",
@@ -289,8 +287,9 @@ local function refreshToolbar()
 	local isToolEquippedValue = playerData:FindFirstChild("IsToolEquipped")
 	local isToolEquipped = isToolEquippedValue and isToolEquippedValue.Value == true
 	local slotCount = math.max(1, #ownedTools)
+	local toolbarWidth = math.max(112, slotCount * 90 + 20)
 	toolbar.BackgroundTransparency = 0
-	toolbar.Size = UDim2.fromOffset(math.max(112, slotCount * 90 + 20), 88)
+	toolbar.Size = UDim2.fromOffset(toolbarWidth, 88)
 
 	new("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
@@ -376,6 +375,22 @@ local function refreshToolbar()
 	end
 end
 
+local function getViewportSize()
+	local camera = Workspace.CurrentCamera
+	return camera and camera.ViewportSize or Vector2.new(1280, 720)
+end
+
+local function applyResponsiveHud()
+	local viewport = getViewportSize()
+	local safeWidth = math.max(280, viewport.X - 24)
+	local topStatsWidth = math.max(504, statLayout.AbsoluteContentSize.X + 28)
+	topStats.Size = UDim2.fromOffset(topStatsWidth, 52)
+	topStatsScale.Scale = math.clamp(safeWidth / topStatsWidth, 0.72, 1)
+
+	local toolbarWidth = toolbar.Size.X.Offset > 0 and toolbar.Size.X.Offset or 112
+	toolbarScale.Scale = math.clamp((viewport.X - 24) / toolbarWidth, 0.74, 1)
+end
+
 local keyCodeToSlot = {
 	[Enum.KeyCode.One] = 1,
 	[Enum.KeyCode.Two] = 2,
@@ -417,6 +432,7 @@ end)
 local function refreshAll()
 	refreshStats()
 	refreshToolbar()
+	applyResponsiveHud()
 end
 
 local activeTween = nil
@@ -443,6 +459,12 @@ local function showFloating(text, color)
 			activeTween = nil
 		end
 	end)
+end
+
+local function showToast(text, toastType)
+	if NotificationClient then
+		NotificationClient.Show(text, { Type = toastType or "Info" })
+	end
 end
 
 local function bindValueSignals(parent)
@@ -476,6 +498,7 @@ if sellFeedbackRemote then
 			SoundUtil.Play("Sell", GameData, playerGui)
 		end
 		showFloating("+" .. formatNumber(cashEarned) .. " Cash", Color3.fromRGB(119, 242, 143))
+		showToast("Vente réussie.", "Success")
 	end)
 end
 
@@ -487,8 +510,15 @@ if attackFeedbackRemote then
 
 		if feedback.Reason == "BackpackFull" then
 			showFloating("Sac plein", Color3.fromRGB(255, 210, 101))
+			showToast("Backpack plein.", "Warning")
+			if SoundUtil then
+				SoundUtil.Play("Error", GameData, playerGui)
+			end
 		elseif feedback.Reason == "ToolUnequipped" then
-			showFloating("Equipe ton outil", Color3.fromRGB(179, 212, 255))
+			if SoundUtil then
+				SoundUtil.Play("Error", GameData, playerGui)
+			end
+			showFloating("Équipe ton outil", Color3.fromRGB(179, 212, 255))
 		elseif feedback.WasteGained and feedback.WasteGained > 0 then
 			local text = "+" .. formatNumber(feedback.WasteGained) .. " Waste"
 			if feedback.DiamondsGained and feedback.DiamondsGained > 0 then
@@ -500,7 +530,13 @@ if attackFeedbackRemote then
 end
 
 statLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	topStats.Size = UDim2.fromOffset(math.max(504, statLayout.AbsoluteContentSize.X + 28), 52)
+	applyResponsiveHud()
 end)
 
+local camera = Workspace.CurrentCamera
+if camera then
+	camera:GetPropertyChangedSignal("ViewportSize"):Connect(applyResponsiveHud)
+end
+
 refreshAll()
+applyResponsiveHud()

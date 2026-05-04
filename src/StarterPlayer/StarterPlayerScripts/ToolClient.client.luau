@@ -16,9 +16,11 @@ if not gameDataModule then
 end
 
 local GameData = require(gameDataModule)
-local soundUtilModule = ReplicatedStorage:WaitForChild("Shared", 10)
-	and ReplicatedStorage.Shared:WaitForChild("SoundUtil", 10)
+local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
+local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 10)
 local SoundUtil = soundUtilModule and require(soundUtilModule)
+local workspaceUtilModule = sharedFolder and sharedFolder:WaitForChild("WorkspaceUtil", 10)
+local WorkspaceUtil = workspaceUtilModule and require(workspaceUtilModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if not remotes then
 	warn("[GEI] Remotes folder is missing. ToolClient stopped.")
@@ -119,6 +121,14 @@ local function calculateFallbackInteractionRadius(size)
 	return math.clamp(halfSurface + extraRange, minRange, maxRange)
 end
 
+local function getWasteZone()
+	if WorkspaceUtil then
+		return WorkspaceUtil.Find(GameData.Spawn.WasteZoneName, GameData.Spawn.WasteZoneFolders, { SearchDescendants = false })
+	end
+
+	return Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
+end
+
 local function getWasteModelFromInstance(instance)
 	if typeof(instance) ~= "Instance" then
 		return nil
@@ -161,7 +171,7 @@ local function findNearestWaste()
 		return nil
 	end
 
-	local wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
+	local wasteZone = getWasteZone()
 	if not wasteZone then
 		return nil
 	end
@@ -392,7 +402,7 @@ RunService.RenderStepped:Connect(function()
 	end
 
 	local root = getRootPart()
-	local wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
+	local wasteZone = getWasteZone()
 	if not root or not wasteZone then
 		return
 	end
