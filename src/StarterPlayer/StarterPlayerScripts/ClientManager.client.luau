@@ -18,13 +18,13 @@ end
 
 local GameData = require(gameDataModule)
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 20)
-local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 20)
+local soundUtilModule = sharedFolder and sharedFolder:FindFirstChild("SoundUtil")
 local SoundUtil = soundUtilModule and require(soundUtilModule)
-local uiIconUtilsModule = sharedFolder and sharedFolder:WaitForChild("UIIconUtils", 20)
+local uiIconUtilsModule = sharedFolder and sharedFolder:FindFirstChild("UIIconUtils")
 local UIIconUtils = uiIconUtilsModule and require(uiIconUtilsModule)
-local notificationModule = sharedFolder and sharedFolder:WaitForChild("NotificationClient", 20)
+local notificationModule = sharedFolder and sharedFolder:FindFirstChild("NotificationClient")
 local NotificationClient = notificationModule and require(notificationModule)
-local numberFormatModule = sharedFolder and sharedFolder:WaitForChild("NumberFormat", 20)
+local numberFormatModule = sharedFolder and sharedFolder:FindFirstChild("NumberFormat")
 local NumberFormat = numberFormatModule and require(numberFormatModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then

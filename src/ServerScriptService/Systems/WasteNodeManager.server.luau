@@ -59,58 +59,109 @@ local function ensureRemote(remoteName)
 	return remote
 end
 
-local function getWasteZone()
-	local wasteZone, path
-	if WorkspaceUtil then
-		wasteZone, path = WorkspaceUtil.Find(GameData.Spawn.WasteZoneName, GameData.Spawn.WasteZoneFolders, { SearchDescendants = false })
-	else
-		wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName)
-		path = "Workspace." .. GameData.Spawn.WasteZoneName
-	end
-	if wasteZone and wasteZone:IsA("Folder") then
-		return wasteZone
+local function getMainBasePart(instance)
+	if not instance then
+		return nil
 	end
 
-	if wasteZone then
-		warnOnce(
-			"WasteZoneWrongType",
-			"[WasteNodeManager] " .. (path or "Workspace.WasteZone") .. " exists but must be a Folder. Replace it manually in Roblox Studio."
-		)
-	else
-		warnOnce(
-			"WasteZoneMissing",
-			"[WasteNodeManager] Missing Workspace.WasteZone. Create a Folder named WasteZone in Workspace."
-		)
+	if instance:IsA("BasePart") then
+		return instance
+	end
+
+	local main = instance:FindFirstChild("Main", true)
+	if main and main:IsA("BasePart") then
+		return main
+	end
+
+	if instance:IsA("Model") and instance.PrimaryPart then
+		return instance.PrimaryPart
+	end
+
+	for _, descendant in ipairs(instance:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			return descendant
+		end
 	end
 
 	return nil
 end
 
+local function getOrCreateSpawnSurface()
+	local folder = Workspace:FindFirstChild("SpawnSurfaces")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "SpawnSurfaces"
+		folder.Parent = Workspace
+	end
+
+	local surfaceName = GameData.Spawn.SurfaceName or "SpawnSurface1"
+	local existing = folder:FindFirstChild(surfaceName)
+	local existingPart = getMainBasePart(existing)
+	if existingPart then
+		return existingPart
+	end
+
+	local part = Instance.new("Part")
+	part.Name = surfaceName
+	part.Anchored = true
+	part.CanCollide = true
+	part.CanTouch = true
+	part.CanQuery = true
+	part.Material = Enum.Material.Concrete
+	part.Color = Color3.fromRGB(74, 84, 90)
+	local worldConfig = GameData.World and GameData.World.SpawnSurface or {}
+	part.Size = worldConfig.Size or Vector3.new(80, 1, 60)
+	part.Position = worldConfig.Position or Vector3.new(0, 1, 20)
+	part:SetAttribute("ZoneId", "Zone1")
+	part.Parent = folder
+
+	warnOnce("EmergencySpawnSurfaceCreated", "[WasteNodeManager] SpawnSurface1 was missing or invalid. Created an emergency Workspace.SpawnSurfaces.SpawnSurface1 so the game stays playable.")
+	return part
+end
+
+local function getWasteZone()
+	local wasteZone, path
+	if WorkspaceUtil then
+		wasteZone, path = WorkspaceUtil.Find(GameData.Spawn.WasteZoneName or "WasteZone", GameData.Spawn.WasteZoneFolders, { SearchDescendants = true })
+	else
+		wasteZone = Workspace:FindFirstChild(GameData.Spawn.WasteZoneName or "WasteZone", true)
+		path = wasteZone and wasteZone:GetFullName() or "Workspace.WasteZone"
+	end
+
+	if wasteZone then
+		return wasteZone
+	end
+
+	local folder = Workspace:FindFirstChild("WasteZone")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "WasteZone"
+		folder.Parent = Workspace
+	end
+
+	warnOnce("WasteZoneAutoCreated", "[WasteNodeManager] WasteZone was missing. Created Workspace.WasteZone automatically so wastes can spawn.")
+	return folder
+end
+
 local function getSpawnSurface()
 	local surface, path
 	if WorkspaceUtil then
-		surface, path = WorkspaceUtil.Find(GameData.Spawn.SurfaceName, GameData.Spawn.SurfaceFolders, { SearchDescendants = false })
+		surface, path = WorkspaceUtil.Find(GameData.Spawn.SurfaceName or "SpawnSurface1", GameData.Spawn.SurfaceFolders, { SearchDescendants = true })
 	else
-		surface = Workspace:FindFirstChild(GameData.Spawn.SurfaceName)
-		path = "Workspace." .. GameData.Spawn.SurfaceName
-	end
-	if surface and surface:IsA("BasePart") then
-		return surface
+		surface = Workspace:FindFirstChild(GameData.Spawn.SurfaceName or "SpawnSurface1", true)
+		path = surface and surface:GetFullName() or "Workspace.SpawnSurface1"
 	end
 
-	if surface then
-		warnOnce(
-			"SpawnSurfaceWrongType",
-			"[WasteNodeManager] " .. (path or "Workspace.SpawnSurface1") .. " exists but must be a Part/BasePart. Replace it manually in Roblox Studio."
-		)
-	else
-		warnOnce(
-			"SpawnSurfaceMissing",
-			"[WasteNodeManager] Missing Workspace.SpawnSurfaces.SpawnSurface1 or Workspace.SpawnSurface1. Create a Part named SpawnSurface1. Recommended size: 80, 1, 60."
-		)
+	local surfacePart = getMainBasePart(surface)
+	if surfacePart then
+		if not surfacePart:GetAttribute("ZoneId") then
+			surfacePart:SetAttribute("ZoneId", "Zone1")
+		end
+		return surfacePart
 	end
 
-	return nil
+	warnOnce("SpawnSurfaceAutoFallback", "[WasteNodeManager] " .. tostring(path or "SpawnSurface1") .. " is missing or has no BasePart. Using an emergency SpawnSurface1 fallback.")
+	return getOrCreateSpawnSurface()
 end
 
 local function fireClient(player, remoteName, ...)

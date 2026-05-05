@@ -14,9 +14,9 @@ end
 
 local GameData = require(gameDataModule)
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 20)
-local soundUtilModule = sharedFolder and sharedFolder:WaitForChild("SoundUtil", 20)
+local soundUtilModule = sharedFolder and sharedFolder:FindFirstChild("SoundUtil")
 local SoundUtil = soundUtilModule and require(soundUtilModule)
-local uiIconUtilsModule = sharedFolder and sharedFolder:WaitForChild("UIIconUtils", 20)
+local uiIconUtilsModule = sharedFolder and sharedFolder:FindFirstChild("UIIconUtils")
 local UIIconUtils = uiIconUtilsModule and require(uiIconUtilsModule)
 local remotes = ReplicatedStorage:WaitForChild("Remotes", 20)
 if not remotes then
