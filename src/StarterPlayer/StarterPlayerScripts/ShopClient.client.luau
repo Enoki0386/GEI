@@ -166,7 +166,7 @@ local title = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(24, 18),
 	Size = UDim2.new(1, -88, 0, 34),
-	Text = "Boutique",
+	Text = "Shop",
 	TextColor3 = Color3.fromRGB(23, 28, 31),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -261,7 +261,7 @@ local detailTitle = new("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	Position = UDim2.fromOffset(76, 16),
 	Size = UDim2.new(1, -94, 0, 48),
-	Text = "Choisis un item",
+	Text = "Choose an item",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -276,7 +276,7 @@ local detailDescription = new("TextLabel", {
 	Font = Enum.Font.GothamMedium,
 	Position = UDim2.fromOffset(18, 78),
 	Size = UDim2.new(1, -36, 0, 54),
-	Text = "Selectionne un item pour voir ses details.",
+	Text = "Select an item to view details.",
 	TextColor3 = Color3.fromRGB(207, 218, 222),
 	TextScaled = true,
 	TextWrapped = true,
@@ -402,7 +402,7 @@ local function refreshDetails()
 
 	detailSwatch.BackgroundColor3 = config.Color
 	detailTitle.Text = config.Name
-	detailDescription.Text = config.Description or "Aucune description pour l'instant."
+	detailDescription.Text = config.Description or "No description yet."
 	clearDetailsStats()
 
 	if selectedCategory == "Tool" then
@@ -656,8 +656,8 @@ local function createTab(tabName, text, category, firstItemId, layoutOrder)
 	tabButtons[tabName] = button
 end
 
-createTab("Tools", "Outils", "Tool", GameData.ToolOrder[1], 1)
-createTab("Backpacks", "Sacs", "Backpack", GameData.BackpackOrder[1], 2)
+createTab("Tools", "Tools", "Tool", GameData.ToolOrder[1], 1)
+createTab("Backpacks", "Backpacks", "Backpack", GameData.BackpackOrder[1], 2)
 
 detailAction.Activated:Connect(function()
 	if ButtonEffects and not ButtonEffects.IsEnabled(detailAction) then
@@ -727,28 +727,28 @@ if purchaseResultRemote then
 				if SoundUtil then
 					SoundUtil.Play("Coin", GameData, playerGui)
 				end
-				showNotification(itemName .. " acheté.", Color3.fromRGB(136, 255, 164))
+				showNotification(itemName .. " bought.", Color3.fromRGB(136, 255, 164))
 			elseif reason == "Equipped" then
-				showNotification(itemName .. " équipé.", Color3.fromRGB(179, 212, 255))
+				showNotification(itemName .. " equipped.", Color3.fromRGB(179, 212, 255))
 			elseif reason == "Unequipped" then
-				showNotification(itemName .. " retiré.", Color3.fromRGB(207, 218, 222))
+				showNotification(itemName .. " unequipped.", Color3.fromRGB(207, 218, 222))
 			else
-				showNotification(itemName .. " mis à jour.", Color3.fromRGB(220, 235, 255))
+				showNotification(itemName .. " updated.", Color3.fromRGB(220, 235, 255))
 			end
 		else
 			if SoundUtil then
 				SoundUtil.Play("Error", GameData, playerGui)
 			end
 
-			local message = "Achat impossible : " .. itemName
+			local message = "Purchase unavailable: " .. itemName
 			if reason == "NotEnoughCash" then
-				message = "Pas assez de Cash."
+				message = "Not enough Cash."
 			elseif reason == "NotEnoughDiamonds" then
-				message = "Pas assez de Diamonds."
+				message = "Not enough Diamonds."
 			elseif reason == "UnknownCategory" then
-				message = "Catégorie de boutique invalide."
+				message = "Invalid shop category."
 			elseif reason == "DataMissing" then
-				message = "Données joueur pas encore prêtes."
+				message = "Player data is not ready yet."
 			end
 			warn("[ShopClient]", message, "reason:", reason)
 			showNotification(message, Color3.fromRGB(255, 177, 137))

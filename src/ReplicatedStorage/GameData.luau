@@ -1,8 +1,8 @@
 local GameData = {}
 
--- CONFIGURATION FACILE À MODIFIER
+-- EASY-TO-EDIT CONFIGURATION
 
--- DEBUG MODE: mettre Enabled = false avant publication
+-- DEBUG MODE: set Enabled = false before publishing
 GameData.Debug = {
 	Enabled = false,
 	StartingCash = 5000,
@@ -19,6 +19,18 @@ GameData.Admin = {
 
 GameData.Spawn = {
 	SurfaceName = "SpawnSurface1",
+	SurfaceNames = {
+		"SpawnSurface1",
+		"SpawnSurface2",
+		"SpawnSurface3",
+		"SpawnSurface4",
+	},
+	SurfaceToZone = {
+		SpawnSurface1 = "Zone1",
+		SpawnSurface2 = "Zone2",
+		SpawnSurface3 = "Zone3",
+		SpawnSurface4 = "Zone4",
+	},
 	SurfaceFolders = { "SpawnSurfaces" },
 	WasteZoneName = "WasteZone",
 	WasteZoneFolders = {},
@@ -169,7 +181,7 @@ GameData.InteractionCircle = {
 }
 
 GameData.Animations = {
-	BrushSwing = "rbxassetid://0", -- à remplacer plus tard
+	BrushSwing = "rbxassetid://0", -- replace later
 }
 
 GameData.Sounds = {
@@ -189,6 +201,36 @@ GameData.Economy = {
 	StartingDiamonds = 0,
 }
 
+GameData.WasteSellMultipliers = {
+	CommonWaste = 1,
+	RareWaste = 1.1,
+	EpicWaste = 1.2,
+	LegendaryWaste = 1.3,
+}
+
+GameData.ZoneWasteScaling = {
+	Zone1 = {
+		HPMultiplier = 1,
+		RewardMultiplier = 1,
+	},
+	Zone2 = {
+		HPMultiplier = 2,
+		RewardMultiplier = 2,
+	},
+	Zone3 = {
+		HPMultiplier = 5,
+		RewardMultiplier = 5,
+	},
+	Zone4 = {
+		HPMultiplier = 10,
+		RewardMultiplier = 10,
+	},
+}
+
+GameData.Monetization = {
+	InfiniteBackpackGamePassId = 0,
+}
+
 GameData.Pets = {
 	MaxEquipped = 3,
 	MaxStorage = 30,
@@ -206,7 +248,7 @@ GameData.Eggs = {
 	StarterEgg = {
 		Id = "StarterEgg",
 		DisplayName = "Starter Egg",
-		Price = 500,
+		Price = 350,
 		Currency = "Cash",
 		Pets = {
 			{

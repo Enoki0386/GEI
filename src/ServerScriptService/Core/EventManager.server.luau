@@ -9,12 +9,14 @@ local REMOTE_NAMES = {
 	"PlayerDataUpdate",
 	"AttackFeedback",
 	"SellFeedback",
+	"TeleportToSell",
 	"ShopState",
 	"PurchaseResult",
 	"TutorialProgress",
 	"PetInventoryUpdated",
 	"PetError",
 	"PetHatchResult",
+	"ZoneFeedback",
 }
 
 local REMOTE_FUNCTION_NAMES = {

@@ -1,5 +1,39 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local World1Data = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("World1Data"))
+local WorkspaceUtil = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WorkspaceUtil"))
+
+local function getZoneFeedbackRemote()
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	if not remotes then
+		remotes = Instance.new("Folder")
+		remotes.Name = "Remotes"
+		remotes.Parent = ReplicatedStorage
+	end
+	local remote = remotes:FindFirstChild("ZoneFeedback")
+	if not remote then
+		remote = Instance.new("RemoteEvent")
+		remote.Name = "ZoneFeedback"
+		remote.Parent = remotes
+	end
+	return remote and remote:IsA("RemoteEvent") and remote or nil
+end
+
+local function fireZoneFeedback(player, success, message)
+	local remote = getZoneFeedbackRemote()
+	if remote then
+		remote:FireClient(player, success, message)
+	end
+end
+
+local function formatNumber(value)
+	value = math.floor(tonumber(value) or 0)
+	if value >= 1000000 then
+		return string.format("%.1fM", value / 1000000)
+	elseif value >= 1000 then
+		return string.format("%.1fK", value / 1000)
+	end
+	return tostring(value)
+end
 
 local function getPartFromObject(object)
 	if not object then
@@ -55,6 +89,32 @@ local function addBillboard(part, title, subtitle)
 	subtitleLabel.Parent = frame
 end
 
+local function updateBillboard(part, title, subtitle)
+	local billboard = part:FindFirstChild("GEIZoneBillboard")
+	if not billboard then
+		addBillboard(part, title, subtitle)
+		return
+	end
+
+	local frame = billboard:FindFirstChildWhichIsA("Frame")
+	if not frame then
+		return
+	end
+
+	local labels = {}
+	for _, child in ipairs(frame:GetChildren()) do
+		if child:IsA("TextLabel") then
+			table.insert(labels, child)
+		end
+	end
+	if labels[1] then
+		labels[1].Text = title
+	end
+	if labels[2] then
+		labels[2].Text = subtitle
+	end
+end
+
 local function teleportToSpawn(player, spawnName)
 	local spawnPart = workspace:FindFirstChild(spawnName, true)
 	if not spawnPart or not spawnPart:IsA("BasePart") then
@@ -67,13 +127,14 @@ local function teleportToSpawn(player, spawnName)
 end
 
 local function setupBarrier(zoneId, zone)
-	local object = workspace:FindFirstChild(zone.BarrierName, true)
+	local object = WorkspaceUtil.Find(zone.BarrierName, { "Barriers" }, { SearchDescendants = true })
 	local part = getPartFromObject(object)
 	if not part then
 		return
 	end
 
-	addBillboard(part, zone.DisplayName, tostring(zone.Cost) .. " " .. tostring(zone.Currency or "Cash"))
+	local costText = zone.Cost and zone.Cost > 0 and (formatNumber(zone.Cost) .. " " .. tostring(zone.Currency or "Cash")) or (zone.LockedText or "Press E to unlock")
+	updateBillboard(part, string.upper(zone.DisplayName), costText)
 	local prompt = part:FindFirstChild("GEIUnlockPrompt")
 	if not prompt then
 		prompt = Instance.new("ProximityPrompt")
@@ -97,14 +158,17 @@ local function setupBarrier(zoneId, zone)
 		end
 		local success, message = _G.GEI.WorldProgress.UnlockZone(player, zoneId, false)
 		print("[ZoneBarrier]", player.Name, zoneId, success, message)
+		fireZoneFeedback(player, success, message)
 		if success then
 			teleportToSpawn(player, zone.SpawnName)
+		elseif message then
+			warn("[ZoneBarrier] " .. player.Name .. ": " .. message)
 		end
 	end)
 end
 
 local function setupPortal()
-	local portal = workspace:FindFirstChild(World1Data.Portal.Name, true)
+	local portal = WorkspaceUtil.Find(World1Data.Portal.Name, { "Areas" }, { SearchDescendants = true })
 	local part = getPartFromObject(portal)
 	if not part then
 		return

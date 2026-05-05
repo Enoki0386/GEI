@@ -82,6 +82,33 @@ local function getRootPart(player)
 	return character:FindFirstChild("HumanoidRootPart")
 end
 
+local function getSellTeleportCFrame()
+	local target
+	if WorkspaceUtil then
+		target = WorkspaceUtil.Find("SellTeleportPoint", { "Areas" }, { SearchDescendants = true })
+	else
+		target = Workspace:FindFirstChild("SellTeleportPoint", true)
+	end
+	if target and target:IsA("BasePart") then
+		return CFrame.new(target.Position + Vector3.new(0, 3, 0))
+	end
+
+	local zone = getZone()
+	if zone then
+		return CFrame.new(zone.Position + Vector3.new(0, 4, 0))
+	end
+
+	return nil
+end
+
+ensureRemote("TeleportToSell").OnServerEvent:Connect(function(player)
+	local root = getRootPart(player)
+	local targetCFrame = getSellTeleportCFrame()
+	if root and targetCFrame then
+		root.CFrame = targetCFrame
+	end
+end)
+
 local function sellForPlayer(player)
 	local now = os.clock()
 	if (lastSellTimes[player] or 0) + GameData.Economy.SellCooldown > now then

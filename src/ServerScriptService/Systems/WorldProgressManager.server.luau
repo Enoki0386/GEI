@@ -43,6 +43,11 @@ local function defaultProgress()
 	return {
 		UnlockedZones = {
 			Zone1 = true,
+			Zone2 = false,
+			Zone3 = false,
+			MachineZone = false,
+			Zone4 = false,
+			Portal = false,
 		},
 		Upgrades = {},
 		BossDefeated = false,
@@ -183,20 +188,48 @@ function WorldProgress.UnlockZone(player, zoneId, free)
 		return true, zone.DisplayName .. " already unlocked"
 	end
 	if zone.Requires and not progress.UnlockedZones[zone.Requires] then
-		return false, "Unlock previous zone first"
+		return false, zone.LockedText or "Unlock previous zone first"
+	end
+	if zone.RequiresBossDefeated and progress.BossDefeated ~= true then
+		return false, zone.LockedText or "Defeat the Boss first"
 	end
 	if not free then
 		local leaderstats = player:FindFirstChild("leaderstats")
 		local currency = leaderstats and leaderstats:FindFirstChild(zone.Currency or "Cash")
 		if not currency or currency.Value < zone.Cost then
-			return false, "Not enough " .. (zone.Currency or "Cash")
+			local missing = math.max(0, (zone.Cost or 0) - (currency and currency.Value or 0))
+			return false, "Not enough " .. (zone.Currency or "Cash") .. ". You need " .. tostring(missing) .. " more."
 		end
 		currency.Value -= zone.Cost
 	end
 	progress.UnlockedZones[zoneId] = true
+	if zoneId == "Portal" then
+		progress.PortalUnlocked = true
+	end
 	createFolderSnapshot(player)
 	save(player)
 	return true, zone.DisplayName .. " unlocked"
+end
+
+function WorldProgress.UnlockAllZones(player)
+	local progress = getProgress(player)
+	for zoneId in pairs(World1Data.Zones) do
+		progress.UnlockedZones[zoneId] = true
+	end
+	progress.PortalUnlocked = true
+	createFolderSnapshot(player)
+	save(player)
+	return true, "All zones unlocked"
+end
+
+function WorldProgress.ResetZones(player)
+	local progress = getProgress(player)
+	progress.UnlockedZones = defaultProgress().UnlockedZones
+	progress.BossDefeated = false
+	progress.PortalUnlocked = false
+	createFolderSnapshot(player)
+	save(player)
+	return true, "Zones reset"
 end
 
 function WorldProgress.SetBossDefeated(player, defeated)

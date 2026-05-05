@@ -280,14 +280,15 @@ gui = new("ScreenGui", {
 }, playerGui)
 
 local inventoryButton = new("TextButton", {
-	AnchorPoint = Vector2.new(1, 1),
+	Name = "InventoryButton",
+	AnchorPoint = Vector2.new(0, 0.5),
 	AutoButtonColor = true,
 	BackgroundColor3 = Color3.fromRGB(24, 30, 35),
 	BackgroundTransparency = 0.08,
 	BorderSizePixel = 0,
 	Font = Enum.Font.GothamBlack,
-	Position = UDim2.new(1, -22, 1, -122),
-	Size = UDim2.fromOffset(120, 42),
+	Position = UDim2.new(0, 18, 0.5, -46),
+	Size = UDim2.fromOffset(118, 40),
 	Text = "Inventory",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = true,
@@ -1080,6 +1081,20 @@ inventoryButton.Activated:Connect(function()
 end)
 closeButton.Activated:Connect(closeInventory)
 
+local openInventoryEvent = playerGui:FindFirstChild("OpenPetInventory")
+if not openInventoryEvent then
+	openInventoryEvent = Instance.new("BindableEvent")
+	openInventoryEvent.Name = "OpenPetInventory"
+	openInventoryEvent.Parent = playerGui
+end
+openInventoryEvent.Event:Connect(function()
+	if overlay.Visible then
+		closeInventory()
+	else
+		openInventory()
+	end
+end)
+
 local hatchGui = new("Frame", {
 	BackgroundColor3 = Color3.fromRGB(6, 8, 11),
 	BackgroundTransparency = 0.08,
@@ -1106,6 +1121,27 @@ local hatchEgg = new("Frame", {
 }, hatchGui)
 new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, hatchEgg)
 
+local hatchViewport = new("ViewportFrame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundTransparency = 1,
+	Position = UDim2.fromScale(0.5, 0.44),
+	Size = UDim2.fromOffset(240, 240),
+	Visible = false,
+	ZIndex = 22,
+}, hatchGui)
+local hatchWorld = new("WorldModel", {}, hatchViewport)
+local hatchCamera = Instance.new("Camera")
+hatchCamera.Parent = hatchViewport
+hatchViewport.CurrentCamera = hatchCamera
+
+local hatchFlash = new("Frame", {
+	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Size = UDim2.fromScale(1, 1),
+	ZIndex = 23,
+}, hatchGui)
+
 local hatchReveal = new("TextLabel", {
 	AnchorPoint = Vector2.new(0.5, 0),
 	BackgroundTransparency = 1,
@@ -1120,37 +1156,126 @@ local hatchReveal = new("TextLabel", {
 }, hatchGui)
 new("UITextSizeConstraint", { MaxTextSize = 34, MinTextSize = 14 }, hatchReveal)
 
+local function findEggMainSource()
+	local plaza = Workspace:FindFirstChild("EggPlaza")
+	local hatcher = plaza and plaza:FindFirstChild("EggHatcher", true) or Workspace:FindFirstChild("EggHatcher", true)
+	if not hatcher then
+		return nil
+	end
+
+	local main = hatcher:FindFirstChild("Main", true)
+	if main and (main:IsA("BasePart") or main:IsA("Model")) then
+		return main
+	end
+
+	if hatcher:IsA("Model") then
+		return hatcher.PrimaryPart or hatcher:FindFirstChildWhichIsA("BasePart", true)
+	end
+
+	return hatcher:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function clearHatchViewport()
+	for _, child in ipairs(hatchWorld:GetChildren()) do
+		child:Destroy()
+	end
+end
+
+local function showEggInViewport()
+	clearHatchViewport()
+	local source = findEggMainSource()
+	if not source then
+		hatchViewport.Visible = false
+		hatchEgg.Visible = true
+		return false
+	end
+
+	local clone = source:Clone()
+	if clone:IsA("BasePart") then
+		local model = Instance.new("Model")
+		model.Name = "EggPreview"
+		clone.Parent = model
+		model.PrimaryPart = clone
+		clone = model
+	elseif clone:IsA("Model") and not clone.PrimaryPart then
+		clone.PrimaryPart = clone:FindFirstChild("Main", true) or clone:FindFirstChildWhichIsA("BasePart", true)
+	end
+
+	clone.Parent = hatchWorld
+	for _, descendant in ipairs(clone:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			descendant.CanTouch = false
+			descendant.CanQuery = false
+		elseif descendant:IsA("BillboardGui") or descendant:IsA("SurfaceGui") or descendant:IsA("ProximityPrompt") then
+			descendant:Destroy()
+		end
+	end
+
+	if clone:IsA("Model") then
+		local cframe, size = clone:GetBoundingBox()
+		clone:PivotTo(CFrame.new(0, 0, 0))
+		local distance = math.max(size.X, size.Y, size.Z) * 2.5
+		hatchCamera.CFrame = CFrame.new(Vector3.new(0, size.Y * 0.25, distance), Vector3.new(0, size.Y * 0.15, 0))
+	elseif clone:IsA("BasePart") then
+		clone.CFrame = CFrame.new(0, 0, 0)
+		local distance = math.max(clone.Size.X, clone.Size.Y, clone.Size.Z) * 2.5
+		hatchCamera.CFrame = CFrame.new(Vector3.new(0, clone.Size.Y * 0.25, distance), Vector3.new(0, clone.Size.Y * 0.15, 0))
+	end
+
+	hatchEgg.Visible = false
+	hatchViewport.Visible = true
+	return true
+end
+
 local function playHatchAnimation(response)
 	local petData = response.Pet
 	local petConfig = response.PetConfig or (petData and getPetConfig(petData.PetId))
 	local rarityColor = petConfig and getRarityColor(petConfig.Rarity) or Color3.fromRGB(255, 255, 255)
 	hatchGui.Visible = true
 	hatchReveal.Text = ""
+	hatchFlash.BackgroundTransparency = 1
 	hatchEgg.BackgroundColor3 = Color3.fromRGB(255, 226, 112)
 	hatchEgg.Size = UDim2.fromOffset(120, 150)
 	hatchEgg.Rotation = 0
+	hatchViewport.Size = UDim2.fromOffset(240, 240)
+	hatchViewport.Rotation = 0
+	showEggInViewport()
 
 	for index = 1, 6 do
 		local rotation = index % 2 == 0 and 12 or -12
-		local tween = TweenService:Create(hatchEgg, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+		local target = hatchViewport.Visible and hatchViewport or hatchEgg
+		local tween = TweenService:Create(target, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
 			Rotation = rotation,
 		})
 		tween:Play()
 		tween.Completed:Wait()
 	end
 
-	local flash = TweenService:Create(hatchEgg, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+	local target = hatchViewport.Visible and hatchViewport or hatchEgg
+	TweenService:Create(target, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Rotation = 0,
-		Size = UDim2.fromOffset(180, 210),
-		BackgroundColor3 = rarityColor,
+		Size = UDim2.fromOffset(280, 280),
+	}):Play()
+	local flash = TweenService:Create(hatchFlash, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 0.12,
 	})
 	flash:Play()
 	flash.Completed:Wait()
+	TweenService:Create(hatchFlash, TweenInfo.new(0.24, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+	}):Play()
 
+	hatchViewport.Visible = false
+	hatchEgg.Visible = true
+	hatchEgg.BackgroundColor3 = rarityColor
+	hatchEgg.Size = UDim2.fromOffset(138, 168)
 	hatchReveal.TextColor3 = rarityColor
 	hatchReveal.Text = "New Pet\n" .. (petData and getPetDisplayName(petData) or (petConfig and petConfig.Name) or "Pet")
-	task.wait(1.35)
+	task.wait(1.05)
 	hatchGui.Visible = false
+	clearHatchViewport()
 end
 
 local hatching = false

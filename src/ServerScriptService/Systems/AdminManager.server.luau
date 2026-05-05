@@ -66,6 +66,14 @@ local function setWaste(player, mode)
 		waste.Value = maxWaste.Value
 	else
 		waste.Value = 0
+		local inventory = data:FindFirstChild("WasteInventory")
+		if inventory then
+			for _, child in ipairs(inventory:GetChildren()) do
+				if child:IsA("IntValue") then
+					child.Value = 0
+				end
+			end
+		end
 	end
 	return true, "Waste updated"
 end
@@ -116,6 +124,20 @@ local function unlockZone(player, zoneId)
 		return false, "WorldProgress missing"
 	end
 	return _G.GEI.WorldProgress.UnlockZone(player, zoneId, true)
+end
+
+local function unlockAllZones(player)
+	if not (_G.GEI and _G.GEI.WorldProgress and _G.GEI.WorldProgress.UnlockAllZones) then
+		return false, "WorldProgress missing"
+	end
+	return _G.GEI.WorldProgress.UnlockAllZones(player)
+end
+
+local function resetZones(player)
+	if not (_G.GEI and _G.GEI.WorldProgress and _G.GEI.WorldProgress.ResetZones) then
+		return false, "WorldProgress missing"
+	end
+	return _G.GEI.WorldProgress.ResetZones(player)
 end
 
 local function teleportTo(player, targetName)
@@ -170,6 +192,10 @@ adminCommandRemote.OnServerInvoke = function(player, command, payload)
 		ok, message = unlockZone(player, "Zone3")
 	elseif command == "UnlockZone4" then
 		ok, message = unlockZone(player, "Zone4")
+	elseif command == "UnlockAllZones" then
+		ok, message = unlockAllZones(player)
+	elseif command == "ResetZones" then
+		ok, message = resetZones(player)
 	elseif command == "Teleport" then
 		ok, message = teleportTo(player, payload.Target or "SpawnLocation")
 	end

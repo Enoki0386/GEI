@@ -120,7 +120,7 @@ if playerGui then
 		Font = Enum.Font.GothamMedium,
 		Position = UDim2.fromOffset(0, 62),
 		Size = UDim2.new(1, 0, 0, 26),
-		Text = "Chargement du monde...",
+		Text = "Loading world...",
 		TextColor3 = Color3.fromRGB(174, 190, 198),
 		TextScaled = true,
 	}, panel)
@@ -171,7 +171,7 @@ if playerGui then
 		MinTextSize = 8,
 	}, percentLabel)
 
-	setStatus("Chargement du monde...", 0.08)
+	setStatus("Loading world...", 0.08)
 end
 
 local function getRemainingTime()
@@ -226,7 +226,7 @@ local function waitForMainHUDReady(timeoutSeconds)
 	return nil
 end
 
-setStatus("Chargement des assets...", 0.18)
+setStatus("Loading assets...", 0.18)
 waitForChildWithinBudget(ReplicatedStorage, "GameData", 1.5)
 waitForChildWithinBudget(ReplicatedStorage, "Remotes", 1.5)
 
@@ -239,7 +239,7 @@ for _, folderName in ipairs({ "ToolModels", "WasteModels", "PetModels", "Sounds"
 end
 
 if #preloadAssets > 0 and getRemainingTime() > 0 then
-	setStatus("Chargement des assets...", 0.34)
+	setStatus("Loading assets...", 0.34)
 
 	local preloadDone = false
 	task.spawn(function()
@@ -254,13 +254,13 @@ if #preloadAssets > 0 and getRemainingTime() > 0 then
 	end
 end
 
-setStatus("Chargement du joueur...", 0.62)
+setStatus("Loading player...", 0.62)
 waitForChildWithinBudget(player, "PlayerData", 1.5)
 
-setStatus("Chargement de l'interface...", 0.78)
+setStatus("Loading UI...", 0.78)
 waitForMainHUDReady(1.75)
 
-setStatus("Pret !", 1)
+setStatus("Ready!", 1)
 task.wait(0.18)
 
 if gui then

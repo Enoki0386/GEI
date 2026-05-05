@@ -358,7 +358,6 @@ local function requestAttack()
 
 	local target = findTarget()
 	if not target then
-		localCooldownUntil = now + 0.05
 		return
 	end
 
@@ -387,7 +386,10 @@ end)
 
 if attackFeedbackRemote then
 	attackFeedbackRemote.OnClientEvent:Connect(function(feedback)
-		if type(feedback) == "table" and feedback.Target then
+		if type(feedback) == "table" and (feedback.Reason == "OutOfRange" or feedback.Reason == "ToolUnequipped") then
+			localCooldownUntil = 0
+		end
+		if type(feedback) == "table" and feedback.Target and (feedback.Damage or feedback.Destroyed) then
 			if SoundUtil then
 				SoundUtil.Play(feedback.Destroyed and "Break" or "Hit", GameData, feedback.Target.PrimaryPart)
 			end

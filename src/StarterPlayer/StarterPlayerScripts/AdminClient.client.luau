@@ -115,6 +115,8 @@ local commands = {
 	{ "UnlockZone2", "Unlock Zone 2", {} },
 	{ "UnlockZone3", "Unlock Zone 3", {} },
 	{ "UnlockZone4", "Unlock Boss Zone", {} },
+	{ "UnlockAllZones", "Unlock All Zones", {} },
+	{ "ResetZones", "Reset Zones", {} },
 	{ "Teleport", "TP Lobby", { Target = "SpawnLocation" } },
 	{ "Teleport", "TP Zone 2", { Target = "SpawnSurface2" } },
 	{ "Teleport", "TP Zone 3", { Target = "SpawnSurface3" } },

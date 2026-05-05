@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
@@ -36,6 +37,7 @@ local equipItemRemote = remotes:WaitForChild("EquipItem", 20)
 local sellFeedbackRemote = remotes:WaitForChild("SellFeedback", 20)
 local attackFeedbackRemote = remotes:WaitForChild("AttackFeedback", 20)
 local playerDataRemote = remotes:WaitForChild("PlayerDataUpdate", 20)
+local teleportToSellRemote = remotes:WaitForChild("TeleportToSell", 20)
 
 local playerGui = player:WaitForChild("PlayerGui", 20)
 local playerData = player:FindFirstChild("PlayerData")
@@ -239,6 +241,128 @@ new("UITextSizeConstraint", {
 	MinTextSize = 14,
 }, floatingText)
 
+local sideButtons = new("Frame", {
+	Name = "SideButtons",
+	AnchorPoint = Vector2.new(0, 0.5),
+	BackgroundTransparency = 1,
+	Position = UDim2.new(0, 18, 0.5, 4),
+	Size = UDim2.fromOffset(128, 40),
+}, gui)
+sideButtons:SetAttribute("GEIClientManaged", true)
+new("UIListLayout", {
+	Padding = UDim.new(0, 8),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+	VerticalAlignment = Enum.VerticalAlignment.Center,
+}, sideButtons)
+
+local function createSideButton(text, layoutOrder, color)
+	local button = new("TextButton", {
+		AutoButtonColor = true,
+		BackgroundColor3 = color,
+		BackgroundTransparency = 0.03,
+		BorderSizePixel = 0,
+		Font = Enum.Font.GothamBlack,
+		LayoutOrder = layoutOrder,
+		Size = UDim2.fromOffset(118, 40),
+		Text = text,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextScaled = true,
+	}, sideButtons)
+	new("UICorner", { CornerRadius = UDim.new(0, 13) }, button)
+	new("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 1, Transparency = 0.78 }, button)
+	new("UITextSizeConstraint", { MaxTextSize = 15, MinTextSize = 8 }, button)
+	return button
+end
+
+local inventoryButton = createSideButton("Inventory", 1, Color3.fromRGB(45, 58, 67))
+local sellButton = createSideButton("Sell", 2, Color3.fromRGB(55, 151, 86))
+inventoryButton.Visible = false
+inventoryButton.Size = UDim2.fromOffset(0, 0)
+inventoryButton.Parent = nil
+
+local backpackFullDismissed = false
+local backpackFullActive = false
+local backpackPopup = new("Frame", {
+	Name = "BackpackFullPopup",
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = Color3.fromRGB(15, 20, 24),
+	BackgroundTransparency = 0.02,
+	BorderSizePixel = 0,
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(420, 236),
+	Visible = false,
+	ZIndex = 60,
+}, gui)
+backpackPopup:SetAttribute("GEIClientManaged", true)
+new("UICorner", { CornerRadius = UDim.new(0, 18) }, backpackPopup)
+new("UIStroke", { Color = Color3.fromRGB(255, 210, 101), Thickness = 1.5, Transparency = 0.18 }, backpackPopup)
+new("UIPadding", {
+	PaddingBottom = UDim.new(0, 18),
+	PaddingLeft = UDim.new(0, 18),
+	PaddingRight = UDim.new(0, 18),
+	PaddingTop = UDim.new(0, 16),
+}, backpackPopup)
+
+local backpackTitle = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamBlack,
+	Size = UDim2.new(1, 0, 0, 34),
+	Text = "Backpack Full",
+	TextColor3 = Color3.fromRGB(255, 226, 126),
+	TextScaled = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ZIndex = 61,
+}, backpackPopup)
+new("UITextSizeConstraint", { MaxTextSize = 26, MinTextSize = 12 }, backpackTitle)
+
+local backpackText = new("TextLabel", {
+	BackgroundTransparency = 1,
+	Font = Enum.Font.GothamMedium,
+	Position = UDim2.fromOffset(0, 42),
+	Size = UDim2.new(1, 0, 0, 54),
+	Text = "Your backpack is full. Sell your waste or upgrade your storage.",
+	TextColor3 = Color3.fromRGB(220, 230, 234),
+	TextScaled = true,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	ZIndex = 61,
+}, backpackPopup)
+new("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 9 }, backpackText)
+
+local backpackButtonHolder = new("Frame", {
+	BackgroundTransparency = 1,
+	Position = UDim2.new(0, 0, 1, -110),
+	Size = UDim2.new(1, 0, 0, 104),
+	ZIndex = 61,
+}, backpackPopup)
+new("UIListLayout", {
+	Padding = UDim.new(0, 8),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, backpackButtonHolder)
+
+local function createPopupButton(text, color, layoutOrder)
+	local button = new("TextButton", {
+		AutoButtonColor = true,
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		Font = Enum.Font.GothamBlack,
+		LayoutOrder = layoutOrder,
+		Size = UDim2.new(1, 0, 0, 30),
+		Text = text,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextScaled = true,
+		ZIndex = 62,
+	}, backpackButtonHolder)
+	new("UICorner", { CornerRadius = UDim.new(0, 10) }, button)
+	new("UITextSizeConstraint", { MaxTextSize = 14, MinTextSize = 8 }, button)
+	return button
+end
+
+local teleportSellButton = createPopupButton("Teleport to Sell", Color3.fromRGB(61, 174, 96), 1)
+local infiniteBackpackButton = createPopupButton("Infinite Backpack", Color3.fromRGB(72, 117, 210), 2)
+local backpackCloseButton = createPopupButton("Close", Color3.fromRGB(56, 64, 70), 3)
+
 local function getValue(name)
 	if not playerData then
 		return 0
@@ -276,6 +400,8 @@ local function getOwnedTools()
 	return result
 end
 
+local showBackpackFullPopup
+
 local function refreshStats()
 	local leaderstats = player:FindFirstChild("leaderstats")
 	local cash = leaderstats and leaderstats:FindFirstChild("Cash")
@@ -286,6 +412,14 @@ local function refreshStats()
 	statLabels.Cash.Text = formatNumber(cash and cash.Value or 0)
 	statLabels.Diamonds.Text = formatNumber(diamonds and diamonds.Value or 0)
 	statLabels.Waste.Text = formatNumber(waste) .. " / " .. formatNumber(maxWaste)
+
+	if waste < maxWaste then
+		backpackFullActive = false
+		backpackFullDismissed = false
+		backpackPopup.Visible = false
+	elseif maxWaste > 0 and waste >= maxWaste and showBackpackFullPopup then
+		showBackpackFullPopup()
+	end
 end
 
 local function refreshToolbar()
@@ -479,6 +613,75 @@ local function showToast(text, toastType)
 	end
 end
 
+function showBackpackFullPopup()
+	if backpackFullDismissed or backpackFullActive then
+		return
+	end
+
+	backpackFullActive = true
+	backpackPopup.Visible = true
+	backpackPopup.Size = UDim2.fromOffset(390, 218)
+	TweenService:Create(backpackPopup, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Size = UDim2.fromOffset(420, 236),
+	}):Play()
+end
+
+local function teleportToSell()
+	if teleportToSellRemote then
+		teleportToSellRemote:FireServer()
+	else
+		showToast("Sell teleport is unavailable.", "Error")
+	end
+end
+
+inventoryButton.Activated:Connect(function()
+	local openPetInventory = playerGui:FindFirstChild("OpenPetInventory")
+	if openPetInventory and openPetInventory:IsA("BindableEvent") then
+		openPetInventory:Fire()
+		return
+	end
+
+	local petsGui = playerGui:FindFirstChild("GEIPets")
+	local petInventoryButton = petsGui and petsGui:FindFirstChild("InventoryButton", true)
+	if not petInventoryButton and petsGui then
+		for _, descendant in ipairs(petsGui:GetDescendants()) do
+			if descendant:IsA("TextButton") and descendant.Text == "Inventory" then
+				petInventoryButton = descendant
+				break
+			end
+		end
+	end
+	if petInventoryButton and petInventoryButton:IsA("TextButton") then
+		petInventoryButton.Selected = true
+	else
+		showToast("Pet inventory is still loading.", "Info")
+	end
+end)
+
+sellButton.Activated:Connect(teleportToSell)
+
+teleportSellButton.Activated:Connect(function()
+	backpackFullDismissed = true
+	backpackFullActive = false
+	backpackPopup.Visible = false
+	teleportToSell()
+end)
+
+infiniteBackpackButton.Activated:Connect(function()
+	local gamePassId = GameData.Monetization and GameData.Monetization.InfiniteBackpackGamePassId
+	if type(gamePassId) == "number" and gamePassId > 0 then
+		MarketplaceService:PromptGamePassPurchase(player, gamePassId)
+	else
+		showToast("Coming soon.", "Info")
+	end
+end)
+
+backpackCloseButton.Activated:Connect(function()
+	backpackFullDismissed = true
+	backpackFullActive = false
+	backpackPopup.Visible = false
+end)
+
 local function bindValueSignals(parent)
 	for _, descendant in ipairs(parent:GetDescendants()) do
 		if descendant:IsA("ValueBase") then
@@ -525,7 +728,7 @@ if sellFeedbackRemote then
 			SoundUtil.Play("Sell", GameData, playerGui)
 		end
 		showFloating("+" .. formatNumber(cashEarned) .. " Cash", Color3.fromRGB(119, 242, 143))
-		showToast("Vente réussie.", "Success")
+		showToast("Sold successfully.", "Success")
 	end)
 end
 
@@ -536,8 +739,9 @@ if attackFeedbackRemote then
 		end
 
 		if feedback.Reason == "BackpackFull" then
-			showFloating("Sac plein", Color3.fromRGB(255, 210, 101))
-			showToast("Backpack plein.", "Warning")
+			showFloating("Backpack Full", Color3.fromRGB(255, 210, 101))
+			showToast("Backpack full.", "Warning")
+			showBackpackFullPopup()
 			if SoundUtil then
 				SoundUtil.Play("Error", GameData, playerGui)
 			end
@@ -545,7 +749,7 @@ if attackFeedbackRemote then
 			if SoundUtil then
 				SoundUtil.Play("Error", GameData, playerGui)
 			end
-			showFloating("Équipe ton outil", Color3.fromRGB(179, 212, 255))
+			showFloating("Equip your tool", Color3.fromRGB(179, 212, 255))
 		elseif feedback.WasteGained and feedback.WasteGained > 0 then
 			local text = "+" .. formatNumber(feedback.WasteGained) .. " Waste"
 			if feedback.DiamondsGained and feedback.DiamondsGained > 0 then

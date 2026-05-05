@@ -92,6 +92,29 @@ local function copyArray(source)
 	return result
 end
 
+local function createDefaultWasteInventory()
+	local result = {}
+	for _, wasteId in ipairs(GameData.WasteOrder or {}) do
+		result[wasteId] = 0
+	end
+	return result
+end
+
+local function sanitizeWasteInventory(wasteInventory)
+	local result = createDefaultWasteInventory()
+	if type(wasteInventory) ~= "table" then
+		return result
+	end
+
+	for wasteId, amount in pairs(wasteInventory) do
+		if type(wasteId) == "string" and GameData.WasteTypes[wasteId] then
+			result[wasteId] = math.max(0, math.floor(tonumber(amount) or 0))
+		end
+	end
+
+	return result
+end
+
 local function createDefaultPetsData()
 	return {
 		Inventory = {},
@@ -246,6 +269,7 @@ local function createDefaultSaveData()
 		Cash = GameData.Economy.StartingCash,
 		Diamonds = GameData.Economy.StartingDiamonds,
 		WasteCount = 0,
+		WasteInventory = createDefaultWasteInventory(),
 		EquippedTool = "Brush",
 		EquippedBackpack = "SmallBag",
 		OwnedTools = {
@@ -273,6 +297,7 @@ local function mergeSaveData(savedData)
 	if type(savedData.WasteCount) == "number" then
 		data.WasteCount = math.max(0, math.floor(savedData.WasteCount))
 	end
+	data.WasteInventory = sanitizeWasteInventory(savedData.WasteInventory)
 	if type(savedData.EquippedTool) == "string" and GameData.GetTool(savedData.EquippedTool) then
 		data.EquippedTool = savedData.EquippedTool
 	end
@@ -359,6 +384,32 @@ local function createOwnedFolder(folderName, ownedSet, parent)
 	for itemId, owned in pairs(ownedSet) do
 		if owned == true then
 			createValue("BoolValue", itemId, true, folder)
+		end
+	end
+
+	return folder
+end
+
+local function createWasteInventoryFolder(wasteInventory, parent)
+	local folder = parent:FindFirstChild("WasteInventory")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "WasteInventory"
+		folder.Parent = parent
+	end
+
+	local sanitized = type(wasteInventory) == "table" and sanitizeWasteInventory(wasteInventory) or nil
+	for _, child in ipairs(folder:GetChildren()) do
+		if child:IsA("IntValue") and not GameData.WasteTypes[child.Name] then
+			child:Destroy()
+		end
+	end
+
+	for _, wasteId in ipairs(GameData.WasteOrder or {}) do
+		if sanitized then
+			createValue("IntValue", wasteId, sanitized[wasteId] or 0, folder)
+		elseif not folder:FindFirstChild(wasteId) then
+			createValue("IntValue", wasteId, 0, folder)
 		end
 	end
 
@@ -520,6 +571,23 @@ local function snapshotPets(dataFolder)
 	return pets
 end
 
+local function snapshotWasteInventory(dataFolder)
+	local folder = dataFolder:FindFirstChild("WasteInventory")
+	local result = createDefaultWasteInventory()
+	if not folder then
+		return result
+	end
+
+	for _, wasteId in ipairs(GameData.WasteOrder or {}) do
+		local value = folder:FindFirstChild(wasteId)
+		if value and value:IsA("IntValue") then
+			result[wasteId] = math.max(0, value.Value)
+		end
+	end
+
+	return result
+end
+
 local function snapshotPlayerData(player)
 	local dataFolder = getPlayerDataFolder(player)
 	local leaderstats = getLeaderstats(player)
@@ -552,6 +620,7 @@ local function snapshotPlayerData(player)
 		Cash = leaderstats.Cash.Value,
 		Diamonds = leaderstats.Diamonds.Value,
 		WasteCount = dataFolder.WasteCount.Value,
+		WasteInventory = snapshotWasteInventory(dataFolder),
 		MaxWaste = dataFolder.MaxWaste.Value,
 		EquippedTool = dataFolder.EquippedTool.Value,
 		IsToolEquipped = dataFolder.IsToolEquipped.Value,
@@ -580,6 +649,7 @@ local function serializePlayer(player)
 		Cash = snapshot.Cash,
 		Diamonds = snapshot.Diamonds,
 		WasteCount = snapshot.WasteCount,
+		WasteInventory = sanitizeWasteInventory(snapshot.WasteInventory),
 		EquippedTool = snapshot.EquippedTool,
 		EquippedBackpack = snapshot.EquippedBackpack,
 		OwnedTools = copySet(snapshot.OwnedTools),
@@ -647,6 +717,7 @@ local function setupPlayer(player)
 
 	createOwnedFolder("OwnedTools", saveData.OwnedTools, dataFolder)
 	createOwnedFolder("OwnedBackpacks", saveData.OwnedBackpacks, dataFolder)
+	createWasteInventoryFolder(saveData.WasteInventory, dataFolder)
 	createPetsFolder(saveData.Pets, dataFolder)
 	updateDerivedStats(player)
 
@@ -885,7 +956,7 @@ function PlayerManager.BuyItem(player, category, itemId)
 	return false, "UnknownCategory"
 end
 
-function PlayerManager.AddWaste(player, amount)
+function PlayerManager.AddWaste(player, amount, wasteId)
 	local dataFolder = getPlayerDataFolder(player)
 	if not dataFolder then
 		return 0
@@ -904,6 +975,12 @@ function PlayerManager.AddWaste(player, amount)
 	end
 
 	wasteValue.Value += accepted
+	local inventory = createWasteInventoryFolder(nil, dataFolder)
+	local inventoryWasteId = GameData.WasteTypes[wasteId] and wasteId or "CommonWaste"
+	local inventoryValue = inventory and inventory:FindFirstChild(inventoryWasteId)
+	if inventoryValue and inventoryValue:IsA("IntValue") then
+		inventoryValue.Value += accepted
+	end
 	pushPlayerData(player)
 	return accepted
 end
@@ -938,8 +1015,32 @@ function PlayerManager.SellWaste(player)
 
 	local buffs = getPetBuffs(player)
 	local cashMultiplier = type(buffs.CashMultiplier) == "number" and math.max(0, buffs.CashMultiplier) or 1
-	local cashEarned = math.max(0, math.floor(GameData.GetCashForWaste(wasteValue.Value) * cashMultiplier))
+	local inventory = createWasteInventoryFolder(nil, dataFolder)
+	local trackedWaste = 0
+	local baseCash = 0
+	for _, wasteId in ipairs(GameData.WasteOrder or {}) do
+		local value = inventory and inventory:FindFirstChild(wasteId)
+		local amount = value and value:IsA("IntValue") and math.max(0, value.Value) or 0
+		local multiplier = (GameData.WasteSellMultipliers and GameData.WasteSellMultipliers[wasteId]) or 1
+		trackedWaste += amount
+		baseCash += GameData.GetCashForWaste(amount) * multiplier
+	end
+
+	if trackedWaste <= 0 and wasteValue.Value > 0 then
+		baseCash = GameData.GetCashForWaste(wasteValue.Value)
+	elseif trackedWaste > wasteValue.Value and trackedWaste > 0 then
+		baseCash *= math.clamp(wasteValue.Value / trackedWaste, 0, 1)
+	end
+
+	local cashEarned = math.max(0, math.floor(baseCash * cashMultiplier))
 	wasteValue.Value = 0
+	if inventory then
+		for _, child in ipairs(inventory:GetChildren()) do
+			if child:IsA("IntValue") then
+				child.Value = 0
+			end
+		end
+	end
 	leaderstats.Cash.Value += cashEarned
 	pushPlayerData(player)
 	return cashEarned

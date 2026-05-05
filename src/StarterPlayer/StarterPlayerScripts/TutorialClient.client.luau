@@ -122,11 +122,11 @@ local completed = {
 }
 
 local tutorialSteps = {
-	{ Key = "ClickedWaste", Text = "Clique sur un Waste Node pour le casser." },
-	{ Key = "BackpackFilled", Text = "Ton backpack se remplit." },
-	{ Key = "SoldWaste", Text = "Va à la SellZone pour vendre." },
-	{ Key = "BoughtItem", Text = "Achète de meilleurs outils au Shop." },
-	{ Key = "HatchedEgg", Text = "Ouvre des oeufs pour obtenir des pets bonus." },
+	{ Key = "ClickedWaste", Text = "Click a Waste Node to break it." },
+	{ Key = "BackpackFilled", Text = "Your backpack fills up." },
+	{ Key = "SoldWaste", Text = "Go to the SellZone to sell." },
+	{ Key = "BoughtItem", Text = "Buy better tools at the Shop." },
+	{ Key = "HatchedEgg", Text = "Open eggs to get bonus pets." },
 }
 
 local currentStepKey = nil

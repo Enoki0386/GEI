@@ -113,6 +113,52 @@ local function getSpawnSurface()
 	return nil
 end
 
+local function getSpawnSurfaceNames()
+	if type(GameData.Spawn.SurfaceNames) == "table" and #GameData.Spawn.SurfaceNames > 0 then
+		return GameData.Spawn.SurfaceNames
+	end
+
+	return { GameData.Spawn.SurfaceName or "SpawnSurface1" }
+end
+
+local function getSpawnSurfaces()
+	local surfaces = {}
+	local seen = {}
+	for _, surfaceName in ipairs(getSpawnSurfaceNames()) do
+		local surface, path
+		if WorkspaceUtil then
+			surface, path = WorkspaceUtil.Find(surfaceName, GameData.Spawn.SurfaceFolders, { SearchDescendants = false })
+		else
+			surface = Workspace:FindFirstChild(surfaceName)
+			path = "Workspace." .. surfaceName
+		end
+
+		if surface and surface:IsA("BasePart") and not seen[surface] then
+			seen[surface] = true
+			table.insert(surfaces, surface)
+		elseif surface then
+			warnOnce(
+				"SpawnSurfaceWrongType_" .. surfaceName,
+				"[WasteNodeManager] " .. (path or ("Workspace." .. surfaceName)) .. " exists but must be a Part/BasePart."
+			)
+		elseif surfaceName == (GameData.Spawn.SurfaceName or "SpawnSurface1") then
+			warnOnce(
+				"SpawnSurfaceMissing_" .. surfaceName,
+				"[WasteNodeManager] Missing Workspace.SpawnSurfaces." .. surfaceName .. " or Workspace." .. surfaceName .. ". Create a Part named " .. surfaceName .. "."
+			)
+		end
+	end
+
+	if #surfaces == 0 then
+		local fallback = getSpawnSurface()
+		if fallback then
+			table.insert(surfaces, fallback)
+		end
+	end
+
+	return surfaces
+end
+
 local function fireClient(player, remoteName, ...)
 	local remote = ensureRemote(remoteName)
 	remote:FireClient(player, ...)
@@ -182,6 +228,11 @@ local function getZoneId(surface)
 		local zoneId = surface:GetAttribute("ZoneId")
 		if type(zoneId) == "string" and zoneId ~= "" then
 			return zoneId
+		end
+
+		local surfaceToZone = GameData.Spawn.SurfaceToZone
+		if type(surfaceToZone) == "table" and type(surfaceToZone[surface.Name]) == "string" then
+			return surfaceToZone[surface.Name]
 		end
 	end
 
@@ -337,10 +388,13 @@ local function isFarFromWaste(position, wasteZone, minDistance)
 	return true
 end
 
-local function countActiveWaste(wasteZone)
+local function countActiveWaste(wasteZone, zoneId)
 	local count = 0
 	for _, wasteModel in ipairs(wasteZone:GetChildren()) do
-		if wasteModel:IsA("Model") and wasteModel:GetAttribute("GEIWasteNode") then
+		if wasteModel:IsA("Model")
+			and wasteModel:GetAttribute("GEIWasteNode")
+			and (zoneId == nil or wasteModel:GetAttribute("ZoneId") == zoneId)
+		then
 			count += 1
 		end
 	end
@@ -889,9 +943,15 @@ end
 
 local function createWasteNode(spawnPosition, wasteZone, surface)
 	local wasteId, wasteConfig = GameData.GetRandomWasteType(random)
-	local maxHP = getRandomHPForWaste(wasteConfig)
-	local rewardWaste = getRewardWasteForHP(wasteConfig, maxHP)
 	local zoneId = getZoneId(surface)
+	local zoneScaling = (GameData.ZoneWasteScaling and GameData.ZoneWasteScaling[zoneId])
+		or (GameData.ZoneWasteScaling and GameData.ZoneWasteScaling.Zone1)
+		or {}
+	local hpMultiplier = math.max(0.1, tonumber(zoneScaling.HPMultiplier) or 1)
+	local rewardMultiplier = math.max(0.1, tonumber(zoneScaling.RewardMultiplier) or 1)
+	local baseHP = getRandomHPForWaste(wasteConfig)
+	local maxHP = math.max(1, math.floor(baseHP * hpMultiplier + 0.5))
+	local rewardWaste = math.max(1, math.floor(getRewardWasteForHP(wasteConfig, baseHP) * rewardMultiplier + 0.5))
 
 	local model = Instance.new("Model")
 	model.Name = wasteConfig.Name
@@ -1034,7 +1094,11 @@ local function handleAttack(player, target)
 
 	if newHP <= 0 then
 		feedback.Destroyed = true
-		feedback.WasteGained = PlayerManager.AddWaste(player, wasteModel:GetAttribute("RewardWaste") or wasteModel:GetAttribute("WasteReward") or 0)
+		feedback.WasteGained = PlayerManager.AddWaste(
+			player,
+			wasteModel:GetAttribute("RewardWaste") or wasteModel:GetAttribute("WasteReward") or 0,
+			wasteModel:GetAttribute("WasteType") or wasteModel:GetAttribute("WasteId")
+		)
 
 		local diamondChance = wasteModel:GetAttribute("DiamondChance") or 0
 		if random:NextNumber() <= diamondChance then
@@ -1061,21 +1125,24 @@ end)
 
 task.spawn(function()
 	while true do
-		local surface = getSpawnSurface()
+		local surfaces = getSpawnSurfaces()
 		local wasteZone = getWasteZone()
 
-		if surface and wasteZone then
-			local activeWaste = countActiveWaste(wasteZone)
-			local targetWaste = getTargetWasteCount(surface)
+		if wasteZone then
+			for _, surface in ipairs(surfaces) do
+				local zoneId = getZoneId(surface)
+				local activeWaste = countActiveWaste(wasteZone, zoneId)
+				local targetWaste = getTargetWasteCount(surface)
 
-			while activeWaste < targetWaste do
-				local spawnPosition = findSpawnPosition(surface, wasteZone)
-				if not spawnPosition then
-					break
+				while activeWaste < targetWaste do
+					local spawnPosition = findSpawnPosition(surface, wasteZone)
+					if not spawnPosition then
+						break
+					end
+
+					createWasteNode(spawnPosition, wasteZone, surface)
+					activeWaste += 1
 				end
-
-				createWasteNode(spawnPosition, wasteZone, surface)
-				activeWaste += 1
 			end
 		end
 
