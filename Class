@@ -1,0 +1,301 @@
+<!DOCTYPE html><html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pour Hana</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }body {
+  min-height: 100vh;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(255, 182, 193, 0.9), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(255, 105, 180, 0.7), transparent 35%),
+    linear-gradient(135deg, #fff1f5, #ffd6e7, #ffc2d8);
+  color: #4a1f2d;
+  overflow-x: hidden;
+}
+
+.hearts {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.heart {
+  position: absolute;
+  color: rgba(255, 70, 130, 0.35);
+  font-size: 24px;
+  animation: float 8s linear infinite;
+}
+
+.heart:nth-child(1) { left: 8%; animation-delay: 0s; font-size: 20px; }
+.heart:nth-child(2) { left: 22%; animation-delay: 2s; font-size: 34px; }
+.heart:nth-child(3) { left: 40%; animation-delay: 4s; font-size: 26px; }
+.heart:nth-child(4) { left: 63%; animation-delay: 1s; font-size: 30px; }
+.heart:nth-child(5) { left: 78%; animation-delay: 3s; font-size: 22px; }
+.heart:nth-child(6) { left: 91%; animation-delay: 5s; font-size: 36px; }
+
+@keyframes float {
+  0% {
+    transform: translateY(110vh) rotate(0deg);
+    opacity: 0;
+  }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% {
+    transform: translateY(-15vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+main {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 18px;
+}
+
+.card {
+  width: min(900px, 100%);
+  padding: 45px;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 25px 80px rgba(145, 31, 74, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  text-align: center;
+  animation: appear 1.2s ease both;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.badge {
+  display: inline-block;
+  padding: 10px 18px;
+  margin-bottom: 22px;
+  border-radius: 999px;
+  background: rgba(255, 105, 160, 0.18);
+  color: #9b1b4f;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+h1 {
+  font-size: clamp(2.8rem, 8vw, 5.7rem);
+  line-height: 1;
+  margin-bottom: 18px;
+  color: #b51658;
+  text-shadow: 0 6px 24px rgba(255, 83, 145, 0.25);
+}
+
+h1 span {
+  display: block;
+  color: #ff3f86;
+}
+
+.subtitle {
+  font-size: clamp(1.1rem, 3vw, 1.45rem);
+  max-width: 680px;
+  margin: 0 auto 32px;
+  line-height: 1.7;
+  color: #5c2639;
+}
+
+.message {
+  margin: 34px auto;
+  padding: 30px;
+  max-width: 720px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  font-size: 1.12rem;
+  line-height: 1.85;
+  color: #512233;
+}
+
+.message strong {
+  color: #c9185a;
+}
+
+.reasons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 35px;
+}
+
+.reason {
+  padding: 24px 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 12px 35px rgba(145, 31, 74, 0.12);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.reason:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 18px 45px rgba(145, 31, 74, 0.2);
+}
+
+.reason .icon {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.reason h2 {
+  font-size: 1.15rem;
+  color: #aa174f;
+  margin-bottom: 8px;
+}
+
+.reason p {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: #5d2c3c;
+}
+
+.signature {
+  margin-top: 38px;
+  font-size: 1.2rem;
+  color: #7a2944;
+}
+
+.signature span {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #d51f66;
+}
+
+button {
+  margin-top: 32px;
+  padding: 15px 28px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff4f93, #c9185a);
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 15px 30px rgba(201, 24, 90, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 20px 40px rgba(201, 24, 90, 0.35);
+}
+
+.secret {
+  margin-top: 22px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.45s ease;
+  font-size: 1.08rem;
+  color: #8f1646;
+  font-weight: 700;
+}
+
+.secret.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 760px) {
+  .card {
+    padding: 30px 20px;
+    border-radius: 26px;
+  }
+
+  .reasons {
+    grid-template-columns: 1fr;
+  }
+
+  .message {
+    padding: 22px;
+  }
+}
+
+  </style>
+</head>
+<body>
+  <div class="hearts">
+    <div class="heart">♥</div>
+    <div class="heart">♥</div>
+    <div class="heart">♥</div>
+    <div class="heart">♥</div>
+    <div class="heart">♥</div>
+    <div class="heart">♥</div>
+  </div>  <main>
+    <section class="card">
+      <div class="badge">Une page faite avec le cœur</div><h1>Pour <span>Hana</span></h1>
+
+  <p class="subtitle">
+    Il y a des personnes qui passent dans une vie, et puis il y a celles qui la rendent plus belle sans même s’en rendre compte.
+  </p>
+
+  <div class="message">
+    Hana, je voulais te créer quelque chose de simple, mais sincère.
+    Une petite page pour te dire que tu comptes énormément pour moi.
+    Quand je pense à toi, tout devient un peu plus doux, plus lumineux, plus vivant.
+    <br /><br />
+    J’aime ta présence, ta façon d’exister, les petits détails qui font que tu es toi.
+    Et même si les mots ne suffisent jamais vraiment, je veux que tu saches une chose :
+    <strong>mon amour pour toi est réel, profond, et précieux.</strong>
+  </div>
+
+  <div class="reasons">
+    <div class="reason">
+      <div class="icon">🌸</div>
+      <h2>Ta douceur</h2>
+      <p>Tu as cette manière de rendre les choses plus calmes, plus belles, juste par ta présence.</p>
+    </div>
+
+    <div class="reason">
+      <div class="icon">✨</div>
+      <h2>Ton sourire</h2>
+      <p>Un simple sourire de toi peut illuminer une journée entière.</p>
+    </div>
+
+    <div class="reason">
+      <div class="icon">💗</div>
+      <h2>Toi, tout simplement</h2>
+      <p>Ce que j’aime le plus, ce n’est pas une seule chose : c’est l’ensemble de tout ce que tu es.</p>
+    </div>
+  </div>
+
+  <button onclick="showSecret()">Clique ici, Hana</button>
+  <p id="secret" class="secret">Je t’aime plus que cette page ne pourra jamais le montrer.</p>
+
+  <div class="signature">
+    Avec tout mon amour,
+    <span>pour Hana ♥</span>
+  </div>
+</section>
+
+  </main>  <script>
+    function showSecret() {
+      const secret = document.getElementById("secret");
+      secret.classList.add("show");
+    }
+  </script></body>
+</html>
